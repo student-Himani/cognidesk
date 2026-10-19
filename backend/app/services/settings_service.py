@@ -272,8 +272,8 @@ class SettingsService:
         ocr_status = "ready"
         supported_ocr_formats = [".png", ".jpg", ".jpeg", ".bmp"]
         try:
-            from app.services.document_processor import DocumentProcessor, easyocr
-            if easyocr is not None and hasattr(DocumentProcessor, "get_ocr_reader"):
+            from app.services.document_processor import DocumentProcessor
+            if getattr(DocumentProcessor, "is_ocr_available", lambda: True)() and hasattr(DocumentProcessor, "get_ocr_reader"):
                 ocr_status = "ready"
             else:
                 ocr_status = "not_configured"

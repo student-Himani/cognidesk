@@ -24,9 +24,12 @@ except ImportError:
     Image = None
 
 try:
-    import fitz  # PyMuPDF
+    import pymupdf as fitz  # PyMuPDF without deprecation warning
 except ImportError:
-    fitz = None
+    try:
+        import fitz
+    except ImportError:
+        fitz = None
 
 try:
     import docx  # python-docx
@@ -43,10 +46,23 @@ try:
 except ImportError:
     openpyxl = None
 
-try:
-    import easyocr  # EasyOCR
-except ImportError:
-    easyocr = None
+# Lazy easyocr loader (avoids heavy PyTorch import at server startup)
+_easyocr = None
+
+def _get_easyocr():
+    global _easyocr
+    if _easyocr is None:
+        try:
+            import easyocr as _mod
+            _easyocr = _mod
+        except ImportError:
+            _easyocr = False
+    return _easyocr if _easyocr is not False else None
+
+def is_ocr_available() -> bool:
+    """Fast check whether EasyOCR is installed without importing PyTorch."""
+    import importlib.util
+    return importlib.util.find_spec("easyocr") is not None
 
 
 class DocumentProcessor:
@@ -57,15 +73,20 @@ class DocumentProcessor:
     _ocr_reader = None
 
     @classmethod
+    def is_ocr_available(cls) -> bool:
+        return is_ocr_available()
+
+    @classmethod
     def get_ocr_reader(cls):
         """Lazy loader for EasyOCR reader to save memory until image OCR is requested."""
-        if cls._ocr_reader is None and easyocr is not None:
+        easyocr_mod = _get_easyocr()
+        if cls._ocr_reader is None and easyocr_mod is not None:
             try:
                 logger.info("Initializing EasyOCR reader (English, offline mode)...")
                 try:
-                    cls._ocr_reader = easyocr.Reader(['en'], gpu=False, download_enabled=False)
+                    cls._ocr_reader = easyocr_mod.Reader(['en'], gpu=False, download_enabled=False)
                 except (TypeError, Exception):
-                    cls._ocr_reader = easyocr.Reader(['en'], gpu=False)
+                    cls._ocr_reader = easyocr_mod.Reader(['en'], gpu=False)
             except Exception as e:
                 logger.warning(f"Could not initialize EasyOCR reader: {e}")
                 cls._ocr_reader = None
@@ -204,7 +225,8 @@ class DocumentProcessor:
                         ocr_needed_pages.append(idx + 1)
 
                 # Fallback to OCR if page has no selectable text
-                if ocr_needed_pages and easyocr is not None:
+                easyocr_mod = _get_easyocr()
+                if ocr_needed_pages and easyocr_mod is not None:
                     reader = self.get_ocr_reader()
                     if reader:
                         for page_num in ocr_needed_pages:
@@ -410,7 +432,8 @@ class DocumentProcessor:
             except Exception as img_err:
                 logger.debug(f"Pillow image inspect notice for {filepath}: {img_err}")
 
-        if easyocr is not None:
+        easyocr_mod = _get_easyocr()
+        if easyocr_mod is not None:
             try:
                 reader = self.get_ocr_reader()
                 if reader:
@@ -463,4 +486,10 @@ class DocumentProcessor:
 
 
 document_processor = DocumentProcessor()
+
+
+def __getattr__(name):
+    if name == "easyocr":
+        return _get_easyocr()
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 

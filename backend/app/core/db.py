@@ -81,7 +81,6 @@ def migrate_sqlite_schema():
     except Exception as e:
         logger.warning(f"Database schema auto-migration notice: {e}")
 
-migrate_sqlite_schema()
 
 def init_db_users():
     """
@@ -251,8 +250,33 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Declarative Base
 Base = declarative_base()
 
+_db_initialized = False
+
+def init_db(force: bool = False):
+    """
+    Initializes database schema, migrations, and default seed records.
+    Safe to call multiple times (idempotent).
+    """
+    global _db_initialized
+    if _db_initialized and not force:
+        return
+    logger.info("Initializing database tables and default records...")
+    try:
+        Base.metadata.create_all(bind=engine)
+        migrate_sqlite_schema()
+        init_db_users()
+        init_db_workspaces()
+        init_db_conversations()
+        init_db_settings()
+        _db_initialized = True
+        logger.info("Database initialization completed successfully.")
+    except Exception as e:
+        logger.error(f"Database initialization error: {e}", exc_info=True)
+
 # FastAPI Dependency for db session
 def get_db():
+    if not _db_initialized:
+        init_db()
     db = SessionLocal()
     try:
         yield db

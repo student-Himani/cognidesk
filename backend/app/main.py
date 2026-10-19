@@ -1,8 +1,10 @@
+import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.logging_config import setup_logging
-from app.core.db import engine, Base, init_db_users, init_db_workspaces, init_db_conversations, init_db_settings
+from app.core.db import engine, Base, init_db
 from app.core.errors import add_exception_handlers
 from app.api.v1.api import api_router
 from app.models.user import User
@@ -17,21 +19,33 @@ from app.models.setting import AppSetting
 
 # 1. Initialize logger configurations
 setup_logging()
+logger = logging.getLogger("app")
 
-# 2. Initialize database tables on startup
-Base.metadata.create_all(bind=engine)
-init_db_users()
-init_db_workspaces()
-init_db_conversations()
-init_db_settings()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan handler: executes startup and shutdown tasks
+    after Uvicorn opens the port, ensuring immediate port binding on cloud hosts.
+    """
+    logger.info("CogniDesk FastAPI server initializing...")
+    try:
+        init_db()
+        logger.info("CogniDesk startup checks passed; ready to serve requests.")
+    except Exception as e:
+        logger.error(f"Non-fatal error during startup initialization: {e}", exc_info=True)
+    yield
+    logger.info("CogniDesk FastAPI server shutting down...")
+
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
     description="CogniDesk Offline AI Workspace Backend API",
+    lifespan=lifespan,
 )
 
-# 3. Register global exception handlers
+# 2. Register global exception handlers
 add_exception_handlers(app)
 
 # CORS Middleware setup with hosted domain support

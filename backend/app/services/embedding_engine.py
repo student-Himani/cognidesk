@@ -16,12 +16,18 @@ logger = logging.getLogger("app")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
-# Lazy import for sentence_transformers
+# Lazy loader for sentence_transformers (avoids heavy PyTorch/Transformers import at server startup)
 _SentenceTransformer = None
-try:
-    from sentence_transformers import SentenceTransformer as _SentenceTransformer
-except ImportError:
-    _SentenceTransformer = None
+
+def get_sentence_transformer_cls():
+    global _SentenceTransformer
+    if _SentenceTransformer is None:
+        try:
+            from sentence_transformers import SentenceTransformer as _ST
+            _SentenceTransformer = _ST
+        except ImportError:
+            _SentenceTransformer = False
+    return _SentenceTransformer if _SentenceTransformer is not False else None
 
 
 class EmbeddingEngine:
@@ -39,17 +45,18 @@ class EmbeddingEngine:
         Lazy singleton loader for SentenceTransformer model.
         """
         if cls._model_instance is None:
-            if _SentenceTransformer is None:
+            ST_cls = get_sentence_transformer_cls()
+            if ST_cls is None:
                 raise ImportError("sentence-transformers is not installed in the environment.")
             
             model_name = getattr(settings, "EMBEDDING_MODEL_NAME", "all-MiniLM-L6-v2")
             logger.info(f"Loading SentenceTransformer model: '{model_name}'...")
             try:
-                cls._model_instance = _SentenceTransformer(model_name)
+                cls._model_instance = ST_cls(model_name)
             except Exception as e:
                 logger.warning(f"Standard SentenceTransformer load notice ({e}). Trying local_files_only=True...")
                 try:
-                    cls._model_instance = _SentenceTransformer(model_name, local_files_only=True)
+                    cls._model_instance = ST_cls(model_name, local_files_only=True)
                 except Exception as ex:
                     logger.error(f"Failed to load SentenceTransformer model '{model_name}': {ex}")
                     raise ex
