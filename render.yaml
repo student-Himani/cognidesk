@@ -1,15 +1,16 @@
 # ==============================================================================
-# Render Blueprint Configuration (Module 31 — CogniDesk Web)
+# Render Blueprint Configuration (CogniDesk Free Web & Python Backend)
 # ==============================================================================
 services:
-  # Backend Web API Service
+  # Backend Web API Service (Python Free Tier)
   - type: web
     name: cognidesk-api
-    env: docker
-    dockerfilePath: ./Dockerfile.backend
-    dockerContext: .
-    plan: starter
+    runtime: python
+    rootDir: backend
+    plan: free
     region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/v1/health
     envVars:
       - key: APP_ENV
@@ -27,7 +28,7 @@ services:
       - key: FRONTEND_URL
         value: https://cognidesk.onrender.com
       - key: CORS_ALLOW_ALL
-        value: "false"
+        value: "true"
       - key: HOSTED_LLM_PROVIDER
         value: groq
       - key: HOSTED_LLM_MODEL
@@ -45,6 +46,7 @@ services:
   - type: web
     name: cognidesk-web
     env: static
+    plan: free
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     routes:
@@ -59,5 +61,5 @@ databases:
   - name: cognidesk-postgres
     databaseName: cognidesk_db
     user: cognidesk_user
-    plan: starter
+    plan: free
     region: oregon

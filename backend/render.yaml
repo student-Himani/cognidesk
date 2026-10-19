@@ -1,0 +1,33 @@
+# ==============================================================================
+# Render Blueprint Configuration (CogniDesk Backend Python Free Service)
+# ==============================================================================
+services:
+  - type: web
+    name: cognidesk-api
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: COGNIDESK_HOSTED_MODE
+        value: "true"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CORS_ALLOW_ALL
+        value: "true"
+      - key: HOSTED_LLM_PROVIDER
+        value: groq
+      - key: HOSTED_LLM_MODEL
+        value: llama-3.3-70b-versatile
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
