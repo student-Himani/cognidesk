@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Frontend Service: Static Nginx Server + SPA Routing + Reverse Proxy
+  # ============================================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: cognidesk-web-frontend
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  # ============================================================================
+  # Backend Service: FastAPI REST & SSE Streaming RAG Server
+  # ============================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: cognidesk-api-backend
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - COGNIDESK_HOSTED_MODE=true
+      - SECRET_KEY=${SECRET_KEY:-cognidesk-ultra-secure-key-production-32c}
+      - DATABASE_URL=postgresql://cognidesk_user:cognidesk_secure_pass@db:5432/cognidesk_db
+      - CHROMA_SERVER_HOST=chroma
+      - CHROMA_SERVER_PORT=8000
+      - CHROMA_SERVER_SSL=false
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - CORS_ORIGINS=["http://localhost", "http://localhost:80", "http://127.0.0.1", "http://localhost:5173"]
+      - CORS_ALLOW_ALL=false
+      - HOSTED_LLM_PROVIDER=${HOSTED_LLM_PROVIDER:-groq}
+      - HOSTED_LLM_MODEL=${HOSTED_LLM_MODEL:-llama-3.3-70b-versatile}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+    volumes:
+      - cognidesk_uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      chroma:
+        condition: service_started
+
+  # ============================================================================
+  # Persistent PostgreSQL Relational Database Service
+  # ============================================================================
+  db:
+    image: postgres:15-alpine
+    container_name: cognidesk-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cognidesk_user
+      POSTGRES_PASSWORD: cognidesk_secure_pass
+      POSTGRES_DB: cognidesk_db
+    volumes:
+      - cognidesk_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cognidesk_user -d cognidesk_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # Persistent ChromaDB Vector Store Service
+  # ============================================================================
+  chroma:
+    image: chromadb/chroma:0.4.24
+    container_name: cognidesk-chromadb
+    restart: unless-stopped
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    volumes:
+      - cognidesk_chromadata:/chroma/chroma
+    ports:
+      - "8001:8000"
+
+volumes:
+  cognidesk_pgdata:
+    driver: local
+  cognidesk_chromadata:
+    driver: local
+  cognidesk_uploads:
+    driver: local

@@ -1,0 +1,107 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+ENV/
+
+# Databases & Vector DBs
+database/*.db
+database/*.sqlite
+vector_db/*
+!vector_db/.gitkeep
+
+# User Uploads & Models
+uploads/*
+!uploads/.gitkeep
+documents/*
+!documents/.gitkeep
+models/*
+!models/.gitkeep
+
+# Build and Production Output
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE & System Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# Test & Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+
+# Local data and private files
+*.sqlite3
+*.db
+*.sqlite
+uploads/
+documents/
+vector_db/
+backups/
+python-runtime/
+
+# Python environments
+.venv/
+venv/
+
+# API keys and secrets
+.env*
+!.env.example
+
+# Model files and caches
+models/
+.cache/
+huggingface_cache/
+
+# Never upload environment secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Ignore generated desktop builds and Python runtimes
+frontend/release/
+frontend/win-unpacked/
+python-runtime/
+
+# Node and Electron dependencies
+node_modules/
+frontend/node_modules/
+
+# Windows app builds
+frontend/release/
+frontend/dist/
+frontend/win-unpacked/
+
+# Python virtual environments
+backend/venv/
+backend/.venv/
+venv/
+
+# Generated Python runtime
+python-runtime/
+
+# Local databases and vector indexes
+*.db
+*.sqlite
+*.sqlite3
+chroma.sqlite3

@@ -1,0 +1,107 @@
+{
+  "name": "cognidesk-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "description": "CogniDesk - Offline AI Knowledge & Document Intelligence Workspace",
+  "author": "CogniDesk Team",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "electron:dev": "electron electron/main.cjs",
+    "electron:start": "electron electron/main.cjs",
+    "build:desktop": "tsc && vite build",
+    "deploy:pages": "npm run build && wrangler pages deploy dist --project-name cognidesk",
+    "package:win": "npm run build && electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "com.cognidesk.desktop",
+    "productName": "CogniDesk",
+    "copyright": "Copyright © 2026 CogniDesk",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "app/**/*",
+          "main.py",
+          "requirements.txt",
+          "!**/venv/**",
+          "!**/__pycache__/**",
+          "!**/*.pyc",
+          "!**/*.pyo",
+          "!**/tests/**",
+          "!**/.pytest_cache/**"
+        ]
+      },
+      {
+        "from": "../python-runtime",
+        "to": "python",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "electron/assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CogniDesk",
+      "uninstallDisplayName": "CogniDesk AI Knowledge Engine",
+      "runAfterFinish": true
+    }
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.2.1",
+    "@types/three": "^0.186.0",
+    "axios": "^1.6.8",
+    "clsx": "^2.1.0",
+    "lucide-react": "^0.344.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-redux": "^9.1.0",
+    "react-router-dom": "^6.22.2",
+    "tailwind-merge": "^2.2.1",
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@types/react": "^18.2.61",
+    "@types/react-dom": "^18.2.19",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.18",
+    "electron": "^41.7.1",
+    "electron-builder": "^26.15.3",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.2.2",
+    "vite": "^5.1.4"
+  }
+}

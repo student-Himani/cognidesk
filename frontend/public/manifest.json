@@ -1,0 +1,32 @@
+{
+  "id": "cognidesk-ai-workspace",
+  "name": "CogniDesk — AI Knowledge & Document Workspace",
+  "short_name": "CogniDesk",
+  "description": "Installable offline-first AI knowledge workspace with in-browser semantic search, documents, notes, flashcards, and private AI inference.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "categories": ["productivity", "education", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/pwa-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
