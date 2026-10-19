@@ -69,7 +69,8 @@ venv/
 !.env.example
 
 # Model files and caches
-models/
+/models/
+!backend/app/models/
 .cache/
 huggingface_cache/
 
