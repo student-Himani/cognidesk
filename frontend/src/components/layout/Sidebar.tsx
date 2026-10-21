@@ -106,8 +106,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
 
         {/* Top Header: Brand Logo & Collapse/Expand Trigger */}
         <div className="flex items-center justify-between h-16 px-3 border-b border-blue-100/80 dark:border-blue-900/40 relative z-10 shrink-0">
-          {collapsed ? (
-            /* Collapsed desktop header: Centered logo toggle */
+          {/* Desktop Collapsed view */}
+          {collapsed && (
             <div className="hidden md:flex items-center justify-center w-full">
               <button
                 type="button"
@@ -122,55 +122,55 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
                 </div>
               </button>
             </div>
-          ) : (
-            /* Expanded desktop & mobile header: Full brand + Collapse button */
-            <div className="flex items-center justify-between w-full">
-              <NavLink
-                to="/"
-                onClick={() => onMobileClose?.()}
-                className="flex items-center space-x-2.5 overflow-hidden group min-w-0"
-              >
-                <div className="relative shrink-0">
-                  <div className="absolute -inset-1 bg-gradient-to-tr from-blue-600 to-cyan-400 rounded-xl blur-xs opacity-40 group-hover:opacity-100 transition-opacity duration-300" />
-                  <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 text-white flex items-center justify-center shadow-md shadow-blue-500/40 group-hover:scale-105 group-hover:rotate-6 transition-all duration-300">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white truncate">
-                    CogniDesk
-                  </span>
-                  <span className="text-[10px] text-blue-600 dark:text-cyan-400 font-bold tracking-wider uppercase truncate">
-                    Offline AI Hub
-                  </span>
-                </div>
-              </NavLink>
-
-              <div className="flex items-center space-x-1 shrink-0">
-                {/* Mobile Close Button */}
-                <button
-                  type="button"
-                  onClick={onMobileClose}
-                  className="md:hidden p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors min-w-[38px] min-h-[38px] flex items-center justify-center cursor-pointer"
-                  title="Close Menu"
-                  aria-label="Close navigation drawer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-
-                {/* Desktop Collapse Button */}
-                <button
-                  type="button"
-                  onClick={toggleCollapse}
-                  className="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-cyan-300 hover:bg-white/60 dark:hover:bg-slate-900/60 hover:scale-105 active:scale-95 transition-all cursor-pointer border border-transparent hover:border-blue-200/50 dark:hover:border-cyan-500/30"
-                  title="Collapse Sidebar"
-                  aria-label="Collapse Sidebar"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
           )}
+
+          {/* Expanded view (always on mobile, or when not collapsed on desktop) */}
+          <div className={`${collapsed ? 'flex md:hidden' : 'flex'} items-center justify-between w-full`}>
+            <NavLink
+              to="/"
+              onClick={() => onMobileClose?.()}
+              className="flex items-center space-x-2.5 overflow-hidden group min-w-0"
+            >
+              <div className="relative shrink-0">
+                <div className="absolute -inset-1 bg-gradient-to-tr from-blue-600 to-cyan-400 rounded-xl blur-xs opacity-40 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 text-white flex items-center justify-center shadow-md shadow-blue-500/40 group-hover:scale-105 group-hover:rotate-6 transition-all duration-300">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white truncate">
+                  CogniDesk
+                </span>
+                <span className="text-[10px] text-blue-600 dark:text-cyan-400 font-bold tracking-wider uppercase truncate">
+                  Offline AI Hub
+                </span>
+              </div>
+            </NavLink>
+
+            <div className="flex items-center space-x-1 shrink-0">
+              {/* Mobile Close Button */}
+              <button
+                type="button"
+                onClick={onMobileClose}
+                className="md:hidden p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors min-w-[38px] min-h-[38px] flex items-center justify-center cursor-pointer"
+                title="Close Menu"
+                aria-label="Close navigation drawer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Desktop Collapse Button */}
+              <button
+                type="button"
+                onClick={toggleCollapse}
+                className="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-cyan-300 hover:bg-white/60 dark:hover:bg-slate-900/60 hover:scale-105 active:scale-95 transition-all cursor-pointer border border-transparent hover:border-blue-200/50 dark:hover:border-cyan-500/30"
+                title="Collapse Sidebar"
+                aria-label="Collapse Sidebar"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Navigation List */}
@@ -189,7 +189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
                     isActive
                       ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 text-white font-semibold shadow-[0_4px_16px_rgba(37,99,235,0.35)] ring-1 ring-white/20 dark:ring-cyan-300/40'
                       : 'text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-cyan-300 hover:bg-white/60 dark:hover:bg-slate-900/60 hover:border-blue-200/50 dark:hover:border-cyan-500/25 border border-transparent'
-                  } ${collapsed ? 'justify-center p-2.5' : 'justify-start px-3.5 py-2.5'}`}
+                  } ${collapsed ? 'justify-start px-3.5 py-2.5 md:justify-center md:p-2.5' : 'justify-start px-3.5 py-2.5'}`}
                 >
                   {/* Icon */}
                   <item.icon
@@ -203,15 +203,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
                   {/* Navigation Text Label (always shown on mobile drawer, toggle on desktop) */}
                   <span
                     className={`ml-3 truncate font-medium flex-1 text-left ${
-                      collapsed ? 'hidden md:hidden' : 'inline'
+                      collapsed ? 'inline md:hidden' : 'inline'
                     }`}
                   >
                     {item.name}
                   </span>
 
                   {/* Active Glowing Dot Indicator */}
-                  {isActive && !collapsed && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.9)] animate-pulse shrink-0 ml-2" />
+                  {isActive && (
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.9)] animate-pulse shrink-0 ml-2 ${
+                        collapsed ? 'inline-block md:hidden' : 'inline-block'
+                      }`}
+                    />
                   )}
                 </NavLink>
 
@@ -225,9 +229,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
             );
           })}
 
-          {/* Recent Chats Section (Only shown when expanded and chats exist) */}
-          {!collapsed && recentChats.length > 0 && (
-            <div className="pt-3 mt-2 border-t border-blue-100/80 dark:border-blue-900/40 space-y-1">
+          {/* Recent Chats Section */}
+          {recentChats.length > 0 && (
+            <div className={`pt-3 mt-2 border-t border-blue-100/80 dark:border-blue-900/40 space-y-1 ${collapsed ? 'block md:hidden' : 'block'}`}>
               <div className="px-3 flex items-center justify-between text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">
                 <span>Recent Chats</span>
                 <span className="text-[9px] text-blue-600 dark:text-cyan-300 font-semibold px-1.5 py-0.2 rounded bg-blue-50 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800/40">
@@ -256,27 +260,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
 
         {/* Bottom Footer: User / Profile & Offline Engine Status */}
         <div className="p-2 border-t border-blue-100/80 dark:border-blue-900/40 space-y-2 relative z-10 shrink-0">
-          {/* Offline Disk Indicator (when expanded) */}
-          {!collapsed && (
-            <div className="p-2.5 rounded-xl bg-white/60 hover:bg-white/80 dark:bg-slate-900/50 dark:hover:bg-slate-900/70 border border-blue-200/50 dark:border-cyan-500/20 space-y-1.5 text-slate-600 dark:text-slate-300 shadow-xs backdrop-blur-md transition-all">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center space-x-1.5">
-                  <HardDrive className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400" />
-                  <span className="font-medium text-[11px]">Local Engine</span>
-                </div>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/40">
-                  100% Offline
-                </span>
+          {/* Offline Disk Indicator */}
+          <div className={`${collapsed ? 'block md:hidden' : 'block'} p-2.5 rounded-xl bg-white/60 hover:bg-white/80 dark:bg-slate-900/50 dark:hover:bg-slate-900/70 border border-blue-200/50 dark:border-cyan-500/20 space-y-1.5 text-slate-600 dark:text-slate-300 shadow-xs backdrop-blur-md transition-all`}>
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-1.5">
+                <HardDrive className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400" />
+                <span className="font-medium text-[11px]">Local Engine</span>
               </div>
-              <div className="w-full h-1.5 bg-slate-200/80 dark:bg-slate-800/80 rounded-full overflow-hidden p-[1px]">
-                <div className="h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-400 w-[40%] rounded-full shadow-xs shadow-cyan-500/50" />
-              </div>
-              <div className="flex justify-between text-[10px] text-slate-400">
-                <span>SQLite + ChromaDB</span>
-                <span className="font-semibold text-blue-600 dark:text-cyan-400">Protected</span>
-              </div>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-800/40">
+                100% Offline
+              </span>
             </div>
-          )}
+            <div className="w-full h-1.5 bg-slate-200/80 dark:bg-slate-800/80 rounded-full overflow-hidden p-[1px]">
+              <div className="h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-400 w-[40%] rounded-full shadow-xs shadow-cyan-500/50" />
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-400">
+              <span>SQLite + ChromaDB</span>
+              <span className="font-semibold text-blue-600 dark:text-cyan-400">Protected</span>
+            </div>
+          </div>
 
           {/* User / Profile Control Button */}
           <div className="relative group/user">
@@ -289,7 +291,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
               onMouseEnter={() => setActiveTooltip('Profile & Settings')}
               onMouseLeave={() => setActiveTooltip(null)}
               className={`w-full flex items-center ${
-                collapsed ? 'justify-center p-2' : 'justify-between p-2'
+                collapsed ? 'justify-between p-2 md:justify-center' : 'justify-between p-2'
               } rounded-xl hover:bg-white/60 dark:hover:bg-slate-900/50 border border-transparent hover:border-blue-200/60 dark:hover:border-cyan-500/30 cursor-pointer transition-all group min-h-[44px]`}
               title="User Profile & Settings"
             >
@@ -304,21 +306,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
                   )}
                 </div>
 
-                {!collapsed && (
-                  <div className="flex flex-col text-left truncate min-w-0">
-                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-blue-600 dark:group-hover:text-cyan-300 transition-colors">
-                      {user?.full_name || (isGuest ? 'Guest User' : 'Local User')}
-                    </span>
-                    <span className="text-[10px] text-slate-400 truncate">
-                      {isGuest ? 'Guest • Offline' : 'Local Account'}
-                    </span>
-                  </div>
-                )}
+                <div className={`flex flex-col text-left truncate min-w-0 ${collapsed ? 'flex md:hidden' : 'flex'}`}>
+                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-blue-600 dark:group-hover:text-cyan-300 transition-colors">
+                    {user?.full_name || (isGuest ? 'Guest User' : 'Local User')}
+                  </span>
+                  <span className="text-[10px] text-slate-400 truncate">
+                    {isGuest ? 'Guest • Offline' : 'Local Account'}
+                  </span>
+                </div>
               </div>
 
-              {!collapsed && (
-                <Shield className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-300 transition-colors shrink-0 ml-1" />
-              )}
+              <Shield className={`w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-300 transition-colors shrink-0 ml-1 ${collapsed ? 'block md:hidden' : 'block'}`} />
             </button>
 
             {/* Tooltip for Profile when Collapsed on Desktop */}

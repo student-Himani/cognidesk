@@ -1115,15 +1115,15 @@ export const ChatPage: React.FC = () => {
         </div>
 
         {/* Floating Rounded Chat Input Bar */}
-        <div className="p-3 md:p-5 pt-2 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#0A0E17] dark:via-[#0A0E17]/90 dark:to-transparent space-y-2.5">
+        <div className="p-2.5 sm:p-3 md:p-5 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#0A0E17] dark:via-[#0A0E17]/90 dark:to-transparent space-y-2">
           
           {/* Mode Switcher Pills & Document Filter */}
-          <div className="flex flex-wrap items-center justify-between gap-2 max-w-4xl mx-auto px-1">
+          <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 max-w-4xl mx-auto px-1">
             <div className="flex items-center space-x-1 bg-slate-100/90 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-xs backdrop-blur-xl">
               <button
                 type="button"
                 onClick={() => handleModeChange('normal')}
-                className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer min-h-[32px] ${
+                className={`flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer min-h-[30px] sm:min-h-[32px] ${
                   chatMode === 'normal'
                     ? 'bg-white dark:bg-[#1e293b] text-blue-700 dark:text-cyan-300 shadow-2xs'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -1136,7 +1136,7 @@ export const ChatPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleModeChange('document')}
-                className={`flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer min-h-[32px] ${
+                className={`flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer min-h-[30px] sm:min-h-[32px] ${
                   chatMode === 'document'
                     ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-2xs'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -1156,7 +1156,7 @@ export const ChatPage: React.FC = () => {
                 <select
                   value={selectedDocId}
                   onChange={(e) => handleDocSelectChange(e.target.value)}
-                  className="bg-slate-100 dark:bg-[#131c2e] text-slate-800 dark:text-slate-200 border border-slate-300/80 dark:border-blue-900/40 rounded-lg px-2 sm:px-2.5 py-1 text-xs focus:outline-none focus:border-blue-500 cursor-pointer font-medium max-w-[130px] sm:max-w-[200px] truncate"
+                  className="bg-slate-100 dark:bg-[#131c2e] text-slate-800 dark:text-slate-200 border border-slate-300/80 dark:border-blue-900/40 rounded-lg px-2 sm:px-2.5 py-1 text-xs focus:outline-none focus:border-blue-500 cursor-pointer font-medium max-w-[120px] sm:max-w-[200px] truncate"
                 >
                   <option value="all">All Indexed ({indexedDocuments.length})</option>
                   {indexedDocuments.map((doc) => (
@@ -1195,7 +1195,7 @@ export const ChatPage: React.FC = () => {
             }}
             className="max-w-4xl mx-auto"
           >
-            <div className="flex items-end space-x-2.5 bg-white/95 dark:bg-[#131c2e] border border-slate-300/90 dark:border-blue-900/50 rounded-2xl px-3.5 py-2.5 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all shadow-xs backdrop-blur-xl">
+            <div className="flex items-end space-x-2 bg-white/95 dark:bg-[#131c2e] border border-slate-300/90 dark:border-blue-900/50 rounded-2xl px-3 py-2 sm:px-3.5 sm:py-2.5 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all shadow-xs backdrop-blur-xl">
               
               {/* Attach Document / OCR File Button */}
               <button
@@ -1205,7 +1205,7 @@ export const ChatPage: React.FC = () => {
                   fileInputRef.current?.click();
                 }}
                 disabled={isUploading || isStreaming}
-                className={`p-2 rounded-xl transition-colors cursor-pointer mb-0.5 shrink-0 ${
+                className={`p-1.5 sm:p-2 rounded-xl transition-colors cursor-pointer mb-0.5 shrink-0 ${
                   chatMode === 'document'
                     ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-cyan-300 hover:text-blue-900 dark:hover:text-white'
                     : 'text-slate-400 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
@@ -1237,7 +1237,7 @@ export const ChatPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={!input.trim() || isStreaming || (chatMode === 'document' && !hasIndexedDocs)}
-                className="w-9 h-9 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center shadow-md shadow-blue-500/25 transition-all cursor-pointer shrink-0 mb-0.5 hover:scale-105 active:scale-95"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center shadow-md shadow-blue-500/25 transition-all cursor-pointer shrink-0 mb-0.5 hover:scale-105 active:scale-95"
                 title="Send Message (Enter to send, Shift+Enter for new line)"
               >
                 {isStreaming ? (
@@ -1247,9 +1247,10 @@ export const ChatPage: React.FC = () => {
                 )}
               </button>
             </div>
-            <div className="flex items-center justify-between px-2 pt-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-              <span>Enter to send • Shift+Enter for new line</span>
-              <span>{isStreaming ? 'Streaming response...' : chatMode === 'document' ? 'ChromaDB Vector RAG' : 'Offline Direct LLM'}</span>
+            <div className="flex items-center justify-between px-2 pt-1 text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+              <span className="hidden sm:inline">Enter to send • Shift+Enter for new line</span>
+              <span className="sm:hidden">{isStreaming ? 'Thinking...' : 'Tap Send'}</span>
+              <span>{isStreaming ? 'Streaming...' : chatMode === 'document' ? 'ChromaDB RAG' : 'Offline LLM'}</span>
             </div>
           </form>
         </div>

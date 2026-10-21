@@ -16,29 +16,41 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
   // Stages: 'entering' -> 'coreIgnite' -> 'contact' -> 'reveal'
   const [animStage, setAnimStage] = useState<'entering' | 'coreIgnite' | 'contact' | 'reveal'>('entering');
   const [isFading, setIsFading] = useState(false);
+  const [webGlSupported, setWebGlSupported] = useState(true);
 
-  // Synchronized Startup States (Module 30 Requirement 5)
-  const [minDurationPassed, setMinDurationPassed] = useState(false);
+  // Synchronized Startup States
   const [backendReady, setBackendReady] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Initializing CogniDesk AI Services...');
-  const [isDelayed, setIsDelayed] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const retryAttempts = useRef(0);
+  const [canSkip, setCanSkip] = useState(false);
+  const completedRef = useRef(false);
 
-  // Check backend health or activate offline in-browser engine
+  const isDesktop = typeof window !== 'undefined' && Boolean((window as any).cognideskDesktop);
+
+  // Finish and enter workspace safely
+  const handleProceed = useCallback(() => {
+    if (completedRef.current) return;
+    completedRef.current = true;
+    setAnimStage('reveal');
+    setIsFading(true);
+    setTimeout(() => {
+      if (onComplete) onComplete();
+    }, 450);
+  }, [onComplete]);
+
+  // Fast non-blocking backend probe
   const checkBackendHealth = useCallback(async () => {
     // If navigator reports offline, immediately activate offline mode
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       setBackendReady(true);
-      setStatusMessage('Offline Mode Active — In-Browser Storage & Engine Ready');
-      setHasError(false);
+      setStatusMessage('Offline Mode Active — In-Browser Storage Ready');
       return true;
     }
 
     try {
       const baseUrl = getApiBaseUrl();
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1800);
+      const timeoutId = setTimeout(() => controller.abort(), 1600);
 
       const res = await fetch(`${baseUrl}/health`, {
         method: 'GET',
@@ -48,89 +60,88 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
 
       if (res.ok) {
         setBackendReady(true);
-        setStatusMessage('AI Knowledge Engine Ready');
-        setHasError(false);
+        setStatusMessage(isDesktop ? 'Local AI Knowledge Engine Ready' : 'Hosted AI Knowledge Engine Ready');
         return true;
       }
     } catch {
       // Backend not yet ready or polling timed out
     }
 
-    // On web PWA deployments, if backend is unreachable after 4 attempts, proceed into offline mode
-    if (retryAttempts.current >= 4 && typeof window !== 'undefined' && !(window as any).cognideskDesktop) {
+    // On mobile / web PWA deployments, never block on backend health; default to in-browser storage
+    if (!isDesktop) {
       setBackendReady(true);
-      setStatusMessage('Offline Mode Active — In-Browser Engine Ready');
-      setHasError(false);
+      setStatusMessage('In-Browser Workspace & Local Storage Ready');
       return true;
     }
 
     return false;
-  }, []);
+  }, [isDesktop]);
 
   // Main Startup Synchronization Lifecycle
   useEffect(() => {
     // Check reduced motion
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedMotion =
+      typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) {
       const fastTimer = setTimeout(() => {
-        setIsFading(true);
-        setTimeout(() => {
-          if (onComplete) onComplete();
-        }, 400);
-      }, 800);
+        handleProceed();
+      }, 500);
       return () => clearTimeout(fastTimer);
     }
 
     const isPreview = typeof window !== 'undefined' && window.location.search.includes('preview_loader=true');
 
-    // Stage 1: Core Ignite at 1200ms
+    // Stage 1: Core Ignite at 700ms
     const igniteTimer = setTimeout(() => {
       setAnimStage('coreIgnite');
-      setStatusMessage('Loading Knowledge Vector Indexes & Models...');
-    }, 1200);
+      setStatusMessage(
+        isDesktop
+          ? 'Loading Knowledge Vector Indexes & Models...'
+          : 'Verifying IndexedDB Storage & Vector Indexes...'
+      );
+    }, 700);
 
-    // Stage 2: Fingertip Contact & Fusion at 2400ms
+    // Allow user to tap/skip after 1000ms
+    const skipTimer = setTimeout(() => {
+      setCanSkip(true);
+    }, 1000);
+
+    // Stage 2: Fingertip Contact & Fusion at 1500ms
     const contactTimer = setTimeout(() => {
       setAnimStage('contact');
-      setStatusMessage('Verifying SQLite Database & Ollama Integration...');
-    }, 2400);
+      setStatusMessage(
+        isDesktop
+          ? 'Verifying SQLite Database & Local Engine...'
+          : 'Connecting to Cloud AI & Local Workspace...'
+      );
+    }, 1500);
 
-    // Stage 3: Minimum 5000ms duration gate
-    const minTimer = setTimeout(() => {
-      setMinDurationPassed(true);
-    }, 5000);
-
-    // Stage 4: Delayed notice if backend takes > 15s
-    const delayedTimer = setTimeout(() => {
-      if (!backendReady) {
-        setIsDelayed(true);
-        setStatusMessage('Backend startup is taking longer than usual...');
+    // Stage 3: Smooth automatic completion for Web & Mobile at 2400ms
+    // Does not force user to wait 5-15 seconds
+    const completionTimer = setTimeout(() => {
+      if (!isPreview) {
+        handleProceed();
       }
-    }, 15000);
+    }, isDesktop ? 4000 : 2500);
+
+    // Stage 4: Absolute safety fallback (max 3800ms)
+    const safetyTimer = setTimeout(() => {
+      if (!isPreview) {
+        handleProceed();
+      }
+    }, isDesktop ? 6000 : 3800);
 
     if (isPreview) {
       return () => {
         clearTimeout(igniteTimer);
+        clearTimeout(skipTimer);
         clearTimeout(contactTimer);
-        clearTimeout(minTimer);
-        clearTimeout(delayedTimer);
+        clearTimeout(completionTimer);
+        clearTimeout(safetyTimer);
       };
     }
 
-    // Health Check Polling Loop (every 600ms)
-    let isSubscribed = true;
-    const pollInterval = setInterval(async () => {
-      if (!isSubscribed) return;
-      retryAttempts.current += 1;
-      const ready = await checkBackendHealth();
-      if (ready && isSubscribed) {
-        clearInterval(pollInterval);
-      } else if (retryAttempts.current > 30 && isSubscribed) {
-        setHasError(true);
-      }
-    }, 600);
-
-    // Initial immediate probe
+    // Non-blocking background health check
     checkBackendHealth();
 
     // Listen to native Electron backend manager status if available
@@ -143,83 +154,56 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
           setStatusMessage('AI Knowledge Engine Ready');
         } else if (status?.status === 'failed') {
           setHasError(true);
-          setStatusMessage('Backend failed to start. Click Retry below.');
+          setStatusMessage('Local backend unavailable. Click continue for offline mode.');
         }
       });
     }
 
     return () => {
-      isSubscribed = false;
-      clearInterval(pollInterval);
       clearTimeout(igniteTimer);
+      clearTimeout(skipTimer);
       clearTimeout(contactTimer);
-      clearTimeout(minTimer);
-      clearTimeout(delayedTimer);
+      clearTimeout(completionTimer);
+      clearTimeout(safetyTimer);
       if (unsubDesktop) unsubDesktop();
     };
-  }, [checkBackendHealth, onComplete, backendReady]);
+  }, [checkBackendHealth, handleProceed, isDesktop]);
 
-  // Complete and reveal real application ONLY when BOTH >= 5s AND backend is ready
-  useEffect(() => {
-    if (minDurationPassed && backendReady && !isFading) {
-      const exitTimer = setTimeout(() => {
-        setAnimStage('reveal');
-        setIsFading(true);
-        const finishTimer = setTimeout(() => {
-          if (onComplete) onComplete();
-        }, 600);
-        return () => clearTimeout(finishTimer);
-      }, 400);
-
-      return () => clearTimeout(exitTimer);
-    }
-  }, [minDurationPassed, backendReady, isFading, onComplete]);
-
-  // Manual Retry Handler
-  const handleRetry = async () => {
-    setHasError(false);
-    setIsDelayed(false);
-    setStatusMessage('Retrying connection to CogniDesk backend...');
-    const desktop = (window as any).cognideskDesktop;
-    if (desktop?.restartBackend) {
-      await desktop.restartBackend();
-    }
-    await checkBackendHealth();
-  };
-
-  // Continue Anyway
-  const handleContinueAnyway = () => {
-    setAnimStage('reveal');
-    setIsFading(true);
-    setTimeout(() => {
-      if (onComplete) onComplete();
-    }, 500);
-  };
-
-
-  // Three.js AI Energy Core & Contact Shockwave
+  // Three.js AI Energy Core & Contact Shockwave with Error Safety & Responsive Resize
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 50);
-    camera.position.z = 3.6;
+    let scene: THREE.Scene;
+    let camera: THREE.PerspectiveCamera;
+    let renderer: THREE.WebGLRenderer;
 
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: true,
-      powerPreference: 'low-power',
-    });
-    renderer.setSize(container.clientWidth || 380, container.clientHeight || 380);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
+    try {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(45, 1, 0.1, 50);
+      camera.position.z = 3.6;
+
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: 'low-power',
+      });
+      const width = container.clientWidth || 320;
+      const height = container.clientHeight || 320;
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      container.appendChild(renderer.domElement);
+    } catch (err) {
+      console.warn('[StartupAnimation] WebGL initialization failed, using CSS glow fallback:', err);
+      setWebGlSupported(false);
+      return;
+    }
 
     const group = new THREE.Group();
     scene.add(group);
 
     // 1. Central Glowing AI Orb Nucleus
-    const orbGeom = new THREE.SphereGeometry(0.16, 32, 32);
+    const orbGeom = new THREE.SphereGeometry(0.16, 24, 24);
     const orbMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
@@ -229,7 +213,7 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
     group.add(orbMesh);
 
     // Inner electric cyan glow aura
-    const innerGlowGeom = new THREE.SphereGeometry(0.26, 24, 24);
+    const innerGlowGeom = new THREE.SphereGeometry(0.26, 20, 20);
     const innerGlowMat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
@@ -239,8 +223,8 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
     const innerGlowMesh = new THREE.Mesh(innerGlowGeom, innerGlowMat);
     group.add(innerGlowMesh);
 
-    // 2. Delicate Thin Counter-Rotating Orbital Rings (Horizontal ellipses framing fingertips)
-    const ringGeom1 = new THREE.TorusGeometry(0.55, 0.012, 16, 64);
+    // 2. Delicate Thin Counter-Rotating Orbital Rings
+    const ringGeom1 = new THREE.TorusGeometry(0.55, 0.012, 16, 48);
     const ringMat1 = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
@@ -250,7 +234,7 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
     ring1.rotation.x = Math.PI / 2.4;
     group.add(ring1);
 
-    const ringGeom2 = new THREE.TorusGeometry(0.85, 0.009, 16, 64);
+    const ringGeom2 = new THREE.TorusGeometry(0.85, 0.009, 16, 48);
     const ringMat2 = new THREE.MeshBasicMaterial({
       color: 0x06b6d4,
       transparent: true,
@@ -261,7 +245,7 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
     ring2.rotation.y = Math.PI / 10;
     group.add(ring2);
 
-    const ringGeom3 = new THREE.TorusGeometry(1.18, 0.007, 16, 64);
+    const ringGeom3 = new THREE.TorusGeometry(1.18, 0.007, 16, 48);
     const ringMat3 = new THREE.MeshBasicMaterial({
       color: 0x818cf8,
       transparent: true,
@@ -273,7 +257,7 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
     group.add(ring3);
 
     // 3. Ambient Synaptic Particle Constellation
-    const particleCount = 80;
+    const particleCount = 50;
     const positions = new Float32Array(particleCount * 3);
     for (let i = 0; i < particleCount; i++) {
       const angle = Math.random() * Math.PI * 2;
@@ -295,7 +279,7 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
     group.add(particles);
 
     // 4. Contact Shockwave Wave Mesh
-    const waveGeom = new THREE.RingGeometry(0.1, 0.15, 48);
+    const waveGeom = new THREE.RingGeometry(0.1, 0.15, 36);
     const waveMat = new THREE.MeshBasicMaterial({
       color: 0xe0f2fe,
       transparent: true,
@@ -305,6 +289,20 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
     });
     const waveMesh = new THREE.Mesh(waveGeom, waveMat);
     group.add(waveMesh);
+
+    // Responsive Canvas Resize Observer
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width;
+        const h = entry.contentRect.height;
+        if (w > 0 && h > 0 && renderer) {
+          renderer.setSize(w, h);
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+        }
+      }
+    });
+    resizeObserver.observe(container);
 
     // Animation Loop
     let frameId: number;
@@ -343,7 +341,8 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
 
     return () => {
       cancelAnimationFrame(frameId);
-      if (container.contains(renderer.domElement)) {
+      resizeObserver.disconnect();
+      if (renderer.domElement && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
       orbGeom.dispose();
@@ -366,8 +365,9 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
 
   return (
     <div
-      className={`fixed inset-0 w-screen h-screen z-[9999] overflow-hidden transition-all duration-700 ease-out select-none pointer-events-none ${
-        isFading ? 'opacity-0 scale-105' : 'opacity-100 scale-100'
+      onClick={() => canSkip && handleProceed()}
+      className={`fixed inset-0 w-screen h-screen z-[9999] overflow-hidden transition-all duration-700 ease-out select-none cursor-pointer ${
+        isFading ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100 pointer-events-auto'
       }`}
       style={{
         backgroundColor: '#0a0e17',
@@ -381,7 +381,7 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
     >
       {/* Ambient center energy glow */}
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full bg-gradient-to-r from-cyan-500/10 via-blue-600/15 to-indigo-500/10 blur-[100px] pointer-events-none -z-10"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] sm:w-[500px] md:w-[700px] h-[340px] sm:h-[400px] md:h-[500px] rounded-full bg-gradient-to-r from-cyan-500/10 via-blue-600/15 to-indigo-500/10 blur-[60px] sm:blur-[100px] pointer-events-none -z-10"
       />
 
       {/* Subtle shockwave flash upon contact */}
@@ -391,108 +391,122 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
         }`}
       />
 
-      {/* 1. Left Side: Robotic Arm gliding in from left - Centered at 50vh */}
+      {/* 1. Left Side: Robotic Arm gliding in from left - Responsively sized */}
       <div
         className="absolute flex items-center justify-end pointer-events-none transition-transform duration-[1200ms] ease-out z-10"
         style={{
           top: '50%',
-          right: 'calc(50vw + 55px)',
+          right: 'calc(50vw + clamp(12px, 3.2vw, 55px))',
           transform:
             animStage === 'entering'
               ? 'translateX(-25vw) translateY(-40.36%)'
               : animStage === 'coreIgnite'
-              ? 'translateX(-5vw) translateY(-40.36%)'
+              ? 'translateX(-6vw) translateY(-40.36%)'
               : 'translateX(0vw) translateY(-40.36%)',
         }}
       >
         <img
           src={robotHandImg}
-          alt=""
-          className="h-[58vh] max-h-[560px] min-h-[380px] w-auto object-contain pointer-events-none select-none"
+          alt="CogniDesk AI robotic arm"
+          className="h-[26vh] sm:h-[38vh] md:h-[56vh] max-h-[190px] sm:max-h-[340px] md:max-h-[540px] min-h-[130px] w-auto object-contain pointer-events-none select-none drop-shadow-[0_0_20px_rgba(6,182,212,0.25)]"
         />
       </div>
 
-      {/* 2. Right Side: Natural Human Arm gliding in from right - Centered at 50vh */}
+      {/* 2. Right Side: Natural Human Arm gliding in from right - Responsively sized */}
       <div
         className="absolute flex items-center justify-start pointer-events-none transition-transform duration-[1200ms] ease-out z-10"
         style={{
           top: '50%',
-          left: 'calc(50vw + 55px)',
+          left: 'calc(50vw + clamp(12px, 3.2vw, 55px))',
           transform:
             animStage === 'entering'
               ? 'translateX(25vw) translateY(-68.55%)'
               : animStage === 'coreIgnite'
-              ? 'translateX(5vw) translateY(-68.55%)'
+              ? 'translateX(6vw) translateY(-68.55%)'
               : 'translateX(0vw) translateY(-68.55%)',
         }}
       >
         <img
           src={humanHandImg}
-          alt=""
-          className="h-[77vh] max-h-[740px] min-h-[500px] w-auto object-contain pointer-events-none select-none"
+          alt="CogniDesk human intelligence arm"
+          className="h-[35vh] sm:h-[50vh] md:h-[74vh] max-h-[250px] sm:max-h-[450px] md:max-h-[710px] min-h-[175px] w-auto object-contain pointer-events-none select-none drop-shadow-[0_0_20px_rgba(59,130,246,0.2)]"
         />
       </div>
 
       {/* 3. Center Contact Point: Three.js AI Energy Core & Shockwave */}
-      <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20 flex items-center justify-center"
-      >
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20 flex items-center justify-center">
         {/* Three.js Canvas Container */}
-        <div
-          ref={mountRef}
-          className={`relative w-[360px] h-[360px] sm:w-[420px] sm:h-[420px] flex items-center justify-center transition-all duration-500 ${
-            animStage === 'entering'
-              ? 'opacity-30 scale-60'
-              : animStage === 'coreIgnite'
-              ? 'opacity-85 scale-90'
-              : 'opacity-100 scale-100'
-          }`}
-        />
+        {webGlSupported ? (
+          <div
+            ref={mountRef}
+            className={`relative w-[200px] h-[200px] sm:w-[300px] sm:h-[300px] md:w-[400px] md:h-[400px] flex items-center justify-center transition-all duration-500 ${
+              animStage === 'entering'
+                ? 'opacity-30 scale-75'
+                : animStage === 'coreIgnite'
+                ? 'opacity-85 scale-90'
+                : 'opacity-100 scale-100'
+            }`}
+          />
+        ) : (
+          /* Pure CSS Glowing Core Fallback if WebGL fails on mobile */
+          <div className="relative w-28 h-28 sm:w-36 sm:h-36 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-white shadow-[0_0_30px_#38bdf8] animate-ping" />
+            <div className="absolute inset-0 rounded-full border-2 border-cyan-400/50 animate-spin" />
+            <div
+              className="absolute inset-2 rounded-full border border-blue-500/60 animate-spin"
+              style={{ animationDirection: 'reverse' }}
+            />
+          </div>
+        )}
 
         {/* Contact Radial Light Burst */}
         {animStage === 'contact' && (
           <>
             <div
-              className="absolute w-44 h-44 rounded-full bg-cyan-400/35 blur-2xl animate-pulse pointer-events-none"
+              className="absolute w-28 sm:w-44 h-28 sm:h-44 rounded-full bg-cyan-400/35 blur-xl sm:blur-2xl animate-pulse pointer-events-none"
               style={{ animationDuration: '600ms' }}
             />
-            <div className="absolute w-14 h-14 rounded-full bg-white blur-sm animate-ping pointer-events-none" />
+            <div className="absolute w-8 sm:w-14 h-8 sm:h-14 rounded-full bg-white blur-xs sm:blur-sm animate-ping pointer-events-none" />
           </>
         )}
       </div>
 
-      {/* 4. Bottom Status & Connection Feedback Bar (Module 30 Requirement 5) */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-3">
-        <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-slate-900/80 backdrop-blur-md border border-cyan-500/25 shadow-lg shadow-cyan-950/40 text-xs sm:text-sm font-medium text-slate-200">
+      {/* 4. Bottom Status & Touch Controls with Safe-Area Insets */}
+      <div className="absolute bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2.5 max-w-[92vw] px-2 text-center pointer-events-auto">
+        {/* Status Pill Badge */}
+        <div className="flex items-center gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-slate-900/85 backdrop-blur-md border border-cyan-500/30 shadow-lg shadow-cyan-950/40 text-xs sm:text-sm font-medium text-slate-200 max-w-full">
           {backendReady ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 animate-pulse" />
+            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0 animate-pulse" />
           ) : hasError ? (
-            <AlertCircle className="w-4 h-4 text-amber-400 animate-bounce" />
+            <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
           ) : (
-            <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400 shrink-0 animate-spin" />
           )}
-          <span>{statusMessage}</span>
+          <span className="truncate max-w-[70vw] sm:max-w-none">{statusMessage}</span>
         </div>
 
-        {/* Interactive action buttons if startup is delayed or failed */}
-        {(isDelayed || hasError) && (
-          <div className="flex items-center gap-2">
+        {/* Interactive action buttons / Skip recovery */}
+        {canSkip && (
+          <div className="flex items-center gap-2 animate-fade-in" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
-              onClick={handleRetry}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-200 border border-cyan-500/40 text-xs transition-colors pointer-events-auto"
+              onClick={handleProceed}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-200 border border-cyan-500/40 text-xs font-semibold transition-all hover:scale-105 active:scale-95 shadow-md shadow-cyan-950/50 cursor-pointer min-h-[34px]"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Retry Backend</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleContinueAnyway}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-700 text-xs transition-colors pointer-events-auto"
-            >
-              <span>Continue to App</span>
+              <span>Enter Workspace</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
+
+            {hasError && (
+              <button
+                type="button"
+                onClick={() => checkBackendHealth()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-700 text-xs transition-colors cursor-pointer min-h-[34px]"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Retry Connection</span>
+              </button>
+            )}
           </div>
         )}
       </div>

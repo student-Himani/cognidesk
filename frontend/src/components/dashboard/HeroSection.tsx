@@ -51,24 +51,29 @@ export const HeroSection: React.FC = () => {
       <div className="flex flex-col items-center justify-center space-y-2 max-w-2xl mx-auto z-10">
         {/* Clean 3D Interactive WebGL Orb - Pure & Unobstructed */}
         <div className="relative group cursor-pointer" title="Interactive 3D CogniDesk Core (Drag to rotate)">
-          <KnowledgeOrb3D size={115} />
+          <div className="hidden sm:block">
+            <KnowledgeOrb3D size={115} />
+          </div>
+          <div className="block sm:hidden">
+            <KnowledgeOrb3D size={80} />
+          </div>
         </div>
 
         {/* Welcome Title with Electric Cobalt / Cyan Gradient */}
-        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white px-2">
           Welcome to{' '}
           <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 bg-clip-text text-transparent">
             CogniDesk
           </span>
         </h1>
-        <p className="text-slate-600 dark:text-slate-400 text-sm md:text-base font-normal">
+        <p className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm md:text-base font-normal max-w-md sm:max-w-xl px-2">
           Your offline AI workspace for private knowledge & document intelligence.
         </p>
       </div>
 
       {/* Vector Illustration - Positioned before the input box as requested */}
-      <div className="w-full max-w-lg mx-auto relative z-10 flex items-center justify-center pt-1 opacity-95">
-        <WorkspaceVector className="w-full h-auto max-h-[160px] md:max-h-[190px]" />
+      <div className="w-full max-w-lg mx-auto relative z-10 flex items-center justify-center pt-1 opacity-95 px-4">
+        <WorkspaceVector className="w-full h-auto max-h-[110px] sm:max-h-[160px] md:max-h-[190px]" />
       </div>
 
       {/* Central AI Prompt Input Card — Positioned AFTER the vector illustration with crisp slate contrast (zero cream) */}
@@ -114,10 +119,10 @@ export const HeroSection: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-                className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-800 border border-slate-300/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer shadow-2xs min-h-[38px]"
+                className="flex items-center space-x-1 xs:space-x-1.5 px-2 xs:px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-800 border border-slate-300/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer shadow-2xs min-h-[38px]"
               >
                 <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400 shrink-0" />
-                <span className="truncate max-w-[120px] sm:max-w-none">AI Assistant ({selectedModel})</span>
+                <span className="truncate max-w-[95px] xs:max-w-[130px] sm:max-w-none">AI Assistant ({selectedModel})</span>
                 <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
               </button>
 

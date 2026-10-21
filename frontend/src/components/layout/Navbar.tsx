@@ -134,12 +134,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
                   <span className="text-[8px] sm:text-[9px] text-blue-600 dark:text-cyan-400 font-bold tracking-wider uppercase leading-none">
                     WORKSPACE
                   </span>
-                  <span className="text-xs font-bold text-slate-900 dark:text-white max-w-[80px] sm:max-w-[130px] truncate leading-tight mt-0.5">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white max-w-[65px] xs:max-w-[95px] sm:max-w-[130px] truncate leading-tight mt-0.5">
                     {activeWorkspace?.name || 'Default Workspace'}
                   </span>
                 </div>
                 <ChevronDown
-                  className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 dark:text-slate-400 transition-transform duration-150 ${
+                  className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 dark:text-slate-400 transition-transform duration-150 shrink-0 ${
                     isWorkspaceOpen ? 'rotate-180 text-blue-600 dark:text-cyan-300' : ''
                   }`}
                 />
@@ -147,7 +147,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
 
             {/* Workspace Dropdown Menu */}
             {isWorkspaceOpen && (
-              <div className="absolute left-0 top-13 mt-1.5 w-80 bg-white dark:bg-[#111827] border border-blue-200/80 dark:border-blue-800/50 rounded-2xl shadow-xl z-50 p-2 text-left space-y-1 animate-pop-in">
+              <div className="absolute left-0 top-13 mt-1.5 w-[calc(100vw-2rem)] max-w-xs bg-white dark:bg-[#111827] border border-blue-200/80 dark:border-blue-800/50 rounded-2xl shadow-xl z-50 p-2 text-left space-y-1 animate-pop-in">
                 <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
                     Select Workspace
@@ -236,16 +236,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
           </div>
 
           {/* Right Suite: Diagnostics, Theme, Notifications, Profile */}
-          <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0" ref={popoverRef}>
+          <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0" ref={popoverRef}>
             {/* Mobile Search Icon Button */}
             <button
               type="button"
               onClick={() => setIsSearchOpen(true)}
-              className="sm:hidden p-2 rounded-xl bg-white/70 hover:bg-white/95 dark:bg-slate-900/50 dark:hover:bg-slate-800/80 border border-blue-200/60 dark:border-cyan-500/30 text-slate-700 dark:text-slate-300 transition-all min-w-[38px] min-h-[38px] flex items-center justify-center cursor-pointer shadow-xs"
+              className="sm:hidden p-1.5 xs:p-2 rounded-xl bg-white/70 hover:bg-white/95 dark:bg-slate-900/50 dark:hover:bg-slate-800/80 border border-blue-200/60 dark:border-cyan-500/30 text-slate-700 dark:text-slate-300 transition-all min-w-[34px] min-h-[34px] xs:min-w-[38px] xs:min-h-[38px] flex items-center justify-center cursor-pointer shadow-xs"
               title="Search workspace (Ctrl+/)"
               aria-label="Search workspace"
             >
-              <Search className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
+              <Search className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-blue-600 dark:text-cyan-400" />
             </button>
 
             {/* Install PWA Button (when available) */}
@@ -253,11 +253,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
               <button
                 type="button"
                 onClick={() => promptPwaInstall()}
-                className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer animate-pulse"
+                className="flex items-center space-x-1 px-2 py-1 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer animate-pulse"
                 title="Install CogniDesk as a Progressive Web App"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Install PWA</span>
+                <span className="hidden md:inline">Install PWA</span>
               </button>
             )}
 
@@ -273,7 +273,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
             <button
               type="button"
               onClick={() => setShowHealthPopover(!showHealthPopover)}
-              className={`sm:hidden p-2 rounded-xl border transition-colors cursor-pointer min-w-[38px] min-h-[38px] flex items-center justify-center shadow-xs ${getStatusColor()}`}
+              className={`sm:hidden p-1.5 xs:p-2 rounded-xl border transition-colors cursor-pointer min-w-[34px] min-h-[34px] xs:min-w-[38px] xs:min-h-[38px] flex items-center justify-center shadow-xs ${getStatusColor()}`}
               title={isOnline ? (health?.status === 'healthy' ? 'API Connected' : 'System Degraded') : 'Offline Mode (Local Storage & Local AI)'}
               aria-label="Server status"
             >
@@ -282,7 +282,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
 
             {/* Health Diagnostics Popover */}
             {showHealthPopover && (
-              <div className="absolute right-14 top-13 mt-1.5 w-72 bg-white dark:bg-[#111827] border border-blue-200/80 dark:border-blue-800/50 rounded-2xl shadow-xl z-50 p-3.5 text-left space-y-3 animate-pop-in">
+              <div className="absolute right-0 sm:right-14 top-13 mt-1.5 w-[calc(100vw-2rem)] max-w-xs bg-white dark:bg-[#111827] border border-blue-200/80 dark:border-blue-800/50 rounded-2xl shadow-xl z-50 p-3.5 text-left space-y-3 animate-pop-in">
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
                   <div className="flex items-center space-x-2">
                     <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
@@ -360,18 +360,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
               id="theme-toggle-btn"
               data-testid="theme-toggle-btn"
               onClick={toggleTheme}
-              className="p-2 rounded-xl bg-white/70 hover:bg-white/95 dark:bg-slate-900/50 dark:hover:bg-slate-800/80 border border-blue-200/60 dark:border-cyan-500/30 text-slate-700 dark:text-slate-300 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-xs hover:shadow-md hover:border-cyan-400/50"
+              className="p-1.5 xs:p-2 rounded-xl bg-white/70 hover:bg-white/95 dark:bg-slate-900/50 dark:hover:bg-slate-800/80 border border-blue-200/60 dark:border-cyan-500/30 text-slate-700 dark:text-slate-300 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-xs hover:shadow-md hover:border-cyan-400/50 min-w-[34px] min-h-[34px] xs:min-w-[38px] xs:min-h-[38px] flex items-center justify-center"
               title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {theme === 'dark' ? (
-                <Moon className="w-4 h-4 text-cyan-300" />
+                <Moon className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-cyan-300" />
               ) : (
-                <Sun className="w-4 h-4 text-amber-500" />
+                <Sun className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-amber-500" />
               )}
             </button>
 
-            {/* Notification Bell */}
-            <div className="relative">
+            {/* Notification Bell (Hidden on small mobile screens to prevent header overflow) */}
+            <div className="relative hidden sm:block">
               <button
                 className="p-2 rounded-xl bg-white/70 hover:bg-white/95 dark:bg-slate-900/50 dark:hover:bg-slate-800/80 border border-blue-200/60 dark:border-cyan-500/30 text-slate-700 dark:text-slate-300 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-xs hover:shadow-md hover:border-cyan-400/50"
                 title="Notifications"
@@ -401,7 +401,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
             )}
 
             {/* User Profile Info & Avatar */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 xs:gap-2">
               <div className="hidden lg:flex flex-col text-right leading-tight">
                 <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[130px]">
                   {user?.full_name || (isGuest ? 'Guest User' : 'Local User')}
@@ -413,11 +413,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
 
               <button
                 onClick={() => navigate('/settings')}
-                className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 p-[1.5px] hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-sm shadow-blue-500/30"
+                className="w-7 h-7 xs:w-8 xs:h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 p-[1.5px] hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-sm shadow-blue-500/30 shrink-0"
                 title={`Logged in as ${user?.full_name || (isGuest ? 'Guest User' : 'Local User')}`}
               >
                 <div className="w-full h-full rounded-[10px] bg-white/90 dark:bg-slate-950 flex items-center justify-center text-slate-700 dark:text-slate-200">
-                  <User className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
+                  <User className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-blue-600 dark:text-cyan-400" />
                 </div>
               </button>
 
@@ -426,10 +426,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
                 id="btn-navbar-logout"
                 data-testid="navbar-logout-btn"
                 onClick={logout}
-                className="p-2 rounded-xl bg-white/70 hover:bg-rose-500/10 dark:bg-slate-900/50 dark:hover:bg-rose-500/20 border border-slate-200/70 dark:border-slate-800 hover:border-rose-400/50 text-slate-600 dark:text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-xs"
+                className="p-1.5 xs:p-2 rounded-xl bg-white/70 hover:bg-rose-500/10 dark:bg-slate-900/50 dark:hover:bg-rose-500/20 border border-slate-200/70 dark:border-slate-800 hover:border-rose-400/50 text-slate-600 dark:text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-xs min-w-[34px] min-h-[34px] xs:min-w-[38px] xs:min-h-[38px] flex items-center justify-center shrink-0"
                 title="Sign out of CogniDesk"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5 xs:w-4 xs:h-4" />
               </button>
             </div>
           </div>
