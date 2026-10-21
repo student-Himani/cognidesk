@@ -3,7 +3,7 @@
 // Offline App-Shell Caching, Static Asset Acceleration, and Network Fallback
 // ==============================================================================
 
-const CACHE_NAME = 'cognidesk-pwa-v1.2';
+const CACHE_NAME = 'cognidesk-pwa-v1.3';
 const MODEL_CACHE_NAME = 'cognidesk-ai-models-v1';
 
 const STATIC_ASSETS = [

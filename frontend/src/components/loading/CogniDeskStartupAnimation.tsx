@@ -91,7 +91,7 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
 
     const isPreview = typeof window !== 'undefined' && window.location.search.includes('preview_loader=true');
 
-    // Stage 1: Core Ignite at 700ms
+    // Stage 1: Core Ignite at 600ms
     const igniteTimer = setTimeout(() => {
       setAnimStage('coreIgnite');
       setStatusMessage(
@@ -99,14 +99,14 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
           ? 'Loading Knowledge Vector Indexes & Models...'
           : 'Verifying IndexedDB Storage & Vector Indexes...'
       );
-    }, 700);
+    }, 600);
 
-    // Allow user to tap/skip after 1000ms
+    // Allow user to tap/skip after 900ms
     const skipTimer = setTimeout(() => {
       setCanSkip(true);
-    }, 1000);
+    }, 900);
 
-    // Stage 2: Fingertip Contact & Fusion at 1500ms
+    // Stage 2: Fingertip Contact & Fusion at 1200ms
     const contactTimer = setTimeout(() => {
       setAnimStage('contact');
       setStatusMessage(
@@ -114,15 +114,14 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
           ? 'Verifying SQLite Database & Local Engine...'
           : 'Connecting to Cloud AI & Local Workspace...'
       );
-    }, 1500);
+    }, 1200);
 
-    // Stage 3: Smooth automatic completion for Web & Mobile at 2400ms
-    // Does not force user to wait 5-15 seconds
+    // Stage 3: Smooth automatic completion for Web & Mobile at 2500ms
     const completionTimer = setTimeout(() => {
       if (!isPreview) {
         handleProceed();
       }
-    }, isDesktop ? 4000 : 2500);
+    }, isDesktop ? 3800 : 2500);
 
     // Stage 4: Absolute safety fallback (max 3800ms)
     const safetyTimer = setTimeout(() => {
@@ -391,45 +390,45 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
         }`}
       />
 
-      {/* 1. Left Side: Robotic Arm gliding in from left - Responsively sized */}
+      {/* 1. Left Side: Robotic Arm gliding in from left - Perfectly meets at 50vw center */}
       <div
-        className="absolute flex items-center justify-end pointer-events-none transition-transform duration-[1200ms] ease-out z-10"
+        className="absolute flex items-center justify-end pointer-events-none transition-transform duration-[1100ms] ease-out z-10"
         style={{
           top: '50%',
-          right: 'calc(50vw + clamp(12px, 3.2vw, 55px))',
+          right: 'calc(50vw - 2px)',
           transform:
             animStage === 'entering'
-              ? 'translateX(-25vw) translateY(-40.36%)'
+              ? 'translateX(-22vw) translateY(-40.42%)'
               : animStage === 'coreIgnite'
-              ? 'translateX(-6vw) translateY(-40.36%)'
-              : 'translateX(0vw) translateY(-40.36%)',
+              ? 'translateX(-6vw) translateY(-40.42%)'
+              : 'translateX(0vw) translateY(-40.42%)',
         }}
       >
         <img
           src={robotHandImg}
           alt="CogniDesk AI robotic arm"
-          className="h-[26vh] sm:h-[38vh] md:h-[56vh] max-h-[190px] sm:max-h-[340px] md:max-h-[540px] min-h-[130px] w-auto object-contain pointer-events-none select-none drop-shadow-[0_0_20px_rgba(6,182,212,0.25)]"
+          className="h-[28vh] sm:h-[40vh] md:h-[56vh] max-h-[220px] sm:max-h-[360px] md:max-h-[540px] min-h-[140px] w-auto object-contain pointer-events-none select-none drop-shadow-[0_0_20px_rgba(6,182,212,0.35)]"
         />
       </div>
 
-      {/* 2. Right Side: Natural Human Arm gliding in from right - Responsively sized */}
+      {/* 2. Right Side: Natural Human Arm gliding in from right - Perfectly meets at 50vw center */}
       <div
-        className="absolute flex items-center justify-start pointer-events-none transition-transform duration-[1200ms] ease-out z-10"
+        className="absolute flex items-center justify-start pointer-events-none transition-transform duration-[1100ms] ease-out z-10"
         style={{
           top: '50%',
-          left: 'calc(50vw + clamp(12px, 3.2vw, 55px))',
+          left: 'calc(50vw - 2px)',
           transform:
             animStage === 'entering'
-              ? 'translateX(25vw) translateY(-68.55%)'
+              ? 'translateX(22vw) translateY(-68.64%)'
               : animStage === 'coreIgnite'
-              ? 'translateX(6vw) translateY(-68.55%)'
-              : 'translateX(0vw) translateY(-68.55%)',
+              ? 'translateX(6vw) translateY(-68.64%)'
+              : 'translateX(0vw) translateY(-68.64%)',
         }}
       >
         <img
           src={humanHandImg}
           alt="CogniDesk human intelligence arm"
-          className="h-[35vh] sm:h-[50vh] md:h-[74vh] max-h-[250px] sm:max-h-[450px] md:max-h-[710px] min-h-[175px] w-auto object-contain pointer-events-none select-none drop-shadow-[0_0_20px_rgba(59,130,246,0.2)]"
+          className="h-[37vh] sm:h-[53vh] md:h-[74vh] max-h-[290px] sm:max-h-[470px] md:max-h-[710px] min-h-[185px] w-auto object-contain pointer-events-none select-none drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]"
         />
       </div>
 
@@ -439,7 +438,7 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
         {webGlSupported ? (
           <div
             ref={mountRef}
-            className={`relative w-[200px] h-[200px] sm:w-[300px] sm:h-[300px] md:w-[400px] md:h-[400px] flex items-center justify-center transition-all duration-500 ${
+            className={`relative w-[220px] h-[220px] sm:w-[320px] sm:h-[320px] md:w-[420px] md:h-[420px] flex items-center justify-center transition-all duration-500 ${
               animStage === 'entering'
                 ? 'opacity-30 scale-75'
                 : animStage === 'coreIgnite'
@@ -459,14 +458,14 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
           </div>
         )}
 
-        {/* Contact Radial Light Burst */}
-        {animStage === 'contact' && (
+        {/* Contact Radial Light Burst at touching fingertips */}
+        {(animStage === 'contact' || animStage === 'reveal') && (
           <>
             <div
-              className="absolute w-28 sm:w-44 h-28 sm:h-44 rounded-full bg-cyan-400/35 blur-xl sm:blur-2xl animate-pulse pointer-events-none"
-              style={{ animationDuration: '600ms' }}
+              className="absolute w-32 sm:w-48 h-32 sm:h-48 rounded-full bg-cyan-400/40 blur-xl sm:blur-2xl animate-pulse pointer-events-none"
+              style={{ animationDuration: '500ms' }}
             />
-            <div className="absolute w-8 sm:w-14 h-8 sm:h-14 rounded-full bg-white blur-xs sm:blur-sm animate-ping pointer-events-none" />
+            <div className="absolute w-10 sm:w-16 h-10 sm:h-16 rounded-full bg-white blur-xs sm:blur-sm animate-ping pointer-events-none" />
           </>
         )}
       </div>
