@@ -161,6 +161,21 @@ class BrowserAiEngine {
     this.activeDownloads.set(modelId, controller);
 
     try {
+      // Storage quota verification before downloading
+      if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
+        try {
+          const estimate = await navigator.storage.estimate();
+          const availableMb = ((estimate.quota || 0) - (estimate.usage || 0)) / (1024 * 1024);
+          if (estimate.quota && availableMb < totalMb * 1.2) {
+            throw new Error(`Insufficient browser storage: required ~${totalMb} MB, available ~${Math.round(availableMb)} MB.`);
+          }
+        } catch (storageErr: any) {
+          if (storageErr.message && storageErr.message.includes('Insufficient browser storage')) {
+            throw storageErr;
+          }
+        }
+      }
+
       const cache = await caches.open(MODEL_CACHE_NAME);
       const startTime = Date.now();
       let loadedMb = 0;
@@ -289,7 +304,7 @@ class BrowserAiEngine {
           "Hello! I am CogniDesk's In-Browser Offline Assistant running 100% locally on your device.\n\n" +
           "• **Offline Storage**: Your notes, flashcards, and chat history are saved in local IndexedDB.\n" +
           "• **Grounded Extractive RAG**: Ingest local text documents to ask questions with verifiable chunk citations.\n" +
-          "• **Zero Network Dependency**: This response was generated without contacting any external servers or backend APIs.";
+          "• **Notice**: This offline mode provides non-neural extractive context from your stored documents with zero external network calls.";
       } else {
         generalAnswer =
           `I am operating in offline in-browser mode. No local document chunks in your workspace matched "${query}".\n\n` +
@@ -299,7 +314,7 @@ class BrowserAiEngine {
       return {
         answer: generalAnswer,
         citations: [],
-        model: 'In-Browser Local Assistant (Offline)',
+        model: 'In-Browser Local Assistant (Offline — Non-Neural Rule-Based)',
         executionTimeMs: Math.round(Date.now() - startTime),
       };
     }
@@ -324,14 +339,16 @@ class BrowserAiEngine {
     let answerText = '';
     if (topSentences.length > 0) {
       answerText =
+        `[Offline Extractive Answer — Non-Neural RAG Context]\n\n` +
         `Based on your offline local documents:\n\n` +
         topSentences.map((s) => `• ${s}`).join('\n') +
         `\n\n*Source: ${chunks[0].docName} (Chunk #${chunks[0].chunkIndex})*`;
     } else {
       answerText =
+        `[Offline Extractive Answer — Non-Neural RAG Context]\n\n` +
         `According to **${chunks[0].docName}**:\n\n` +
         `"${chunks[0].snippet.slice(0, 350)}..."\n\n` +
-        `*(Answered locally in browser using offline semantic context)*`;
+        `*(Answered locally in browser using offline semantic context extraction)*`;
     }
 
     return {
@@ -339,8 +356,8 @@ class BrowserAiEngine {
       citations,
       model:
         modelId === 'in-browser-extractive'
-          ? 'In-Browser Extractive RAG (Offline)'
-          : `In-Browser Extractive RAG (Offline Fallback for ${modelId})`,
+          ? 'In-Browser Extractive RAG (Offline — Non-Neural)'
+          : `In-Browser Extractive RAG (Offline Non-Neural Fallback for ${modelId})`,
       executionTimeMs: Math.max(Date.now() - startTime, 15),
     };
   }

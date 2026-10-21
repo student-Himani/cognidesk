@@ -8,9 +8,14 @@ function resolveInitialBaseUrl(): string {
   }
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem('cognidesk_api_base_url');
-    if (saved && saved.trim()) return saved.trim();
+    // If a previous erroneous pages.dev same-origin URL was saved, discard it
+    if (saved && saved.trim() && !saved.includes('pages.dev')) return saved.trim();
 
     const hostname = window.location.hostname;
+    if (hostname.includes('pages.dev')) {
+      return 'https://cognidesk-fdc8.onrender.com/api/v1';
+    }
+
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '';
     if (!isLocalhost) {
       // On hosted web deployments, route to same-domain reverse proxy by default

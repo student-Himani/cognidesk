@@ -53,7 +53,7 @@ cors_origins = settings.get_cors_origins() + ["null"]
 origin_regex = (
     r"https?://.*"
     if getattr(settings, "CORS_ALLOW_ALL", False)
-    else r"(https?://(localhost|127\.0\.0\.1)(:\d+)?|file://.*|vscode-file://.*)"
+    else r"(https?://(localhost|127\.0\.0\.1)(:\d+)?|https://cognidesk\.pages\.dev|https://[a-zA-Z0-9-]+\.pages\.dev|file://.*|vscode-file://.*)"
 )
 
 app.add_middleware(

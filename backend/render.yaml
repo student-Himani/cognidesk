@@ -19,8 +19,10 @@ services:
         value: "true"
       - key: SECRET_KEY
         generateValue: true
+      - key: FRONTEND_URL
+        value: https://cognidesk.pages.dev
       - key: CORS_ALLOW_ALL
-        value: "true"
+        value: "false"
       - key: HOSTED_LLM_PROVIDER
         value: groq
       - key: HOSTED_LLM_MODEL

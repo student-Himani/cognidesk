@@ -9,7 +9,7 @@ const installListeners = new Set<InstallPromptCallback>();
 
 export function registerServiceWorker() {
   if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
+    const register = () => {
       // Register sw.js at root scope
       navigator.serviceWorker
         .register('/sw.js', { scope: '/' })
@@ -35,7 +35,13 @@ export function registerServiceWorker() {
         .catch((error) => {
           console.warn('[PWA] Service Worker registration failed:', error);
         });
-    });
+    };
+
+    if (document.readyState === 'complete') {
+      register();
+    } else {
+      window.addEventListener('load', register);
+    }
 
     // Capture install prompt event for custom install button
     window.addEventListener('beforeinstallprompt', (e: Event) => {

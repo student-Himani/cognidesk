@@ -217,17 +217,26 @@ class RAGPipelineService:
             except Exception:
                 pass
 
-        # If local Ollama is not reachable, check if hosted LLM mode or API keys are active
-        has_hosted = (
-            getattr(settings, "is_hosted", lambda: False)() or
-            bool(getattr(settings, "HOSTED_LLM_PROVIDER", None)) or
-            bool(getattr(settings, "GROQ_API_KEY", None)) or
-            bool(getattr(settings, "OPENAI_API_KEY", None)) or
-            bool(getattr(settings, "ANTHROPIC_API_KEY", None)) or
-            bool(getattr(settings, "OPENROUTER_API_KEY", None))
+        has_hosted = getattr(settings, "is_hosted", lambda: False)()
+        has_keys = bool(
+            getattr(settings, "GROQ_API_KEY", None) or
+            getattr(settings, "OPENAI_API_KEY", None) or
+            getattr(settings, "ANTHROPIC_API_KEY", None) or
+            getattr(settings, "OPENROUTER_API_KEY", None)
         )
 
         if has_hosted:
+            if not has_keys:
+                return {
+                    "online": False,
+                    "is_hosted": True,
+                    "unconfigured": True,
+                    "provider": "unconfigured",
+                    "base_url": "",
+                    "models": [],
+                    "mode_label": "Hosted AI (Setup Required)",
+                    "setup_message": "No hosted AI provider API key is configured. Add GROQ_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY in Render environment variables."
+                }
             provider_name = getattr(settings, "HOSTED_LLM_PROVIDER", None) or (
                 "groq" if getattr(settings, "GROQ_API_KEY", None) else (
                     "openrouter" if getattr(settings, "OPENROUTER_API_KEY", None) else (

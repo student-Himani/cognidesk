@@ -142,6 +142,7 @@ class Settings(BaseSettings):
         "http://localhost:5174",
         "http://127.0.0.1:5174",
         "http://localhost:3000",
+        "https://cognidesk.pages.dev",
     ]
 
     # Hosted Cloud AI Providers (Configured securely via backend environment)
