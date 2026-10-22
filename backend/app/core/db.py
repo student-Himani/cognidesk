@@ -218,20 +218,38 @@ def init_db_settings():
         db = SessionLocal()
         try:
             current = db.query(AppSetting).filter(AppSetting.id == 1).first()
-            if not current:
+            is_hosted = settings.is_hosted()
+            if current:
+                # In hosted deployment, automatically ensure offline mode doesn't block cloud AI
+                if is_hosted and current.is_offline_mode:
+                    current.is_offline_mode = False
+                    if current.ai_provider == "ollama":
+                        current.ai_provider = "cloud"
+                    db.commit()
+            else:
                 logger.info("Initializing Default Settings in SQLite database (ID: 1).")
+                # Choose appropriate default cloud provider based on environment variables
+                default_cloud_provider = "openai"
+                default_cloud_model = "gpt-4o-mini"
+                if getattr(settings, "GEMINI_API_KEY", None):
+                    default_cloud_provider = "gemini"
+                    default_cloud_model = "gemini-1.5-flash"
+                elif getattr(settings, "GROQ_API_KEY", None):
+                    default_cloud_provider = "groq"
+                    default_cloud_model = "llama-3.3-70b-versatile"
+
                 default_setting = AppSetting(
                     id=1,
-                    ai_provider="ollama",
+                    ai_provider="cloud" if is_hosted else "ollama",
                     ollama_base_url="http://127.0.0.1:11434",
                     ollama_model="qwen2.5:3b",
                     ollama_fallback_models="qwen2.5:7b,llama3.2:3b,mistral:7b",
                     enable_ollama_fallback=True,
-                    cloud_provider="openai",
-                    cloud_model="gpt-4o-mini",
+                    cloud_provider=default_cloud_provider,
+                    cloud_model=default_cloud_model,
                     cloud_api_key=None,
                     cloud_base_url="https://api.openai.com/v1",
-                    is_offline_mode=True,
+                    is_offline_mode=not is_hosted,
                     embedding_model="all-MiniLM-L6-v2",
                     chunk_size=500,
                     chunk_overlap=50,

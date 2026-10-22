@@ -543,17 +543,17 @@ class FlashcardsService:
     # Ollama Batch Generation with Corrective Prompt Retry
     # =========================================================================
 
-    def _generate_cards_with_ollama(
+    def _generate_cards_with_llm(
         self,
-        base_url: str,
-        model: str,
+        provider: Any,
+        model: Optional[str],
         doc_filename: str,
         context_chunks: List[Dict[str, Any]],
         target_count: int,
         seen_questions: Set[str],
     ) -> List[Dict[str, Any]]:
         """
-        Generates cards using local Ollama.
+        Generates cards using the active LLM provider (hosted Groq/Gemini/OpenAI/Anthropic or local Ollama).
         If initial generation produces malformed JSON or fewer valid cards, retries with a corrective prompt.
         """
         context_blocks = []
@@ -594,36 +594,27 @@ class FlashcardsService:
             "]"
         )
 
-        custom_timeout = httpx.Timeout(240.0, connect=20.0, read=240.0, write=30.0)
         parsed_cards: List[Dict[str, Any]] = []
         raw_response = ""
 
         try:
-            payload = {
-                "model": model,
-                "prompt": user_prompt,
-                "system": sys_prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.2,
-                    "num_predict": min(1500, max(450, target_count * 120)),
-                    "num_ctx": 3072,
-                },
-            }
-            with httpx.Client(timeout=custom_timeout) as client:
-                res = client.post(f"{base_url}/api/generate", json=payload)
-                if res.status_code == 200:
-                    raw_response = res.json().get("response", "").strip()
-                    parsed_cards = self._extract_cards_json(raw_response, seen_questions)
-                else:
-                    logger.warning(f"Ollama returned status {res.status_code}: {res.text}")
+            if hasattr(provider, "generate"):
+                res = provider.generate(
+                    prompt=user_prompt,
+                    system=sys_prompt,
+                    model=model,
+                    temperature=0.2,
+                    max_tokens=min(2500, max(500, target_count * 150))
+                )
+                raw_response = getattr(res, "text", "") or ""
+                parsed_cards = self._extract_cards_json(raw_response, seen_questions)
         except Exception as e:
-            logger.error(f"Error querying Ollama for flashcards: {e}", exc_info=True)
+            logger.error(f"Error querying LLM provider for flashcards: {e}", exc_info=True)
 
         # Corrective Retry if failed or returned fewer than half requested cards
-        if len(parsed_cards) < target_count:
+        if len(parsed_cards) < target_count and provider:
             logger.info(
-                f"Initial Ollama pass produced {len(parsed_cards)}/{target_count} valid cards. "
+                f"Initial LLM pass produced {len(parsed_cards)}/{target_count} valid cards. "
                 "Retrying with corrective prompt..."
             )
             needed = target_count - len(parsed_cards)
@@ -638,29 +629,21 @@ class FlashcardsService:
                 "- DO NOT use placeholder text or schema examples.\n\n"
                 f"=== DOCUMENT CONTEXT ===\n{context_str}\n=== END CONTEXT ===\n"
             )
-
             try:
-                payload = {
-                    "model": model,
-                    "prompt": corrective_prompt,
-                    "system": sys_prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.2,
-                        "num_predict": min(1200, max(350, needed * 120)),
-                        "num_ctx": 3072,
-                    },
-                }
-                with httpx.Client(timeout=custom_timeout) as client:
-                    res = client.post(f"{base_url}/api/generate", json=payload)
-                    if res.status_code == 200:
-                        retry_response = res.json().get("response", "").strip()
-                        retry_cards = self._extract_cards_json(retry_response, seen_questions)
-                        parsed_cards.extend(retry_cards)
+                res2 = provider.generate(
+                    prompt=corrective_prompt,
+                    system=sys_prompt,
+                    model=model,
+                    temperature=0.2,
+                    max_tokens=min(2500, max(500, needed * 150))
+                )
+                retry_response = getattr(res2, "text", "") or ""
+                retry_cards = self._extract_cards_json(retry_response, seen_questions)
+                parsed_cards.extend(retry_cards)
             except Exception as e:
-                logger.warning(f"Ollama corrective retry error: {e}")
+                logger.warning(f"Flashcard corrective retry notice: {e}")
 
-        return parsed_cards
+        return parsed_cards[:target_count]
 
     # =========================================================================
     # Chunk Gathering & Text Validation
@@ -800,20 +783,23 @@ class FlashcardsService:
         # 2. Gather Document Chunks with validation
         chunk_data = self._get_document_chunks_and_validate(db, doc, count)
 
-        # 3. Check Local Ollama Status
-        ollama_status = rag_service.check_ollama_status(db=db)
-        base_url = ollama_status["base_url"]
+        # 3. Resolve Active LLM Provider (Hosted Groq/Gemini/OpenAI/Anthropic or Local Ollama)
+        provider = None
         target_model = model or getattr(settings, "DEFAULT_MODEL", "qwen2.5:3b")
-        if ollama_status["online"]:
-            available = ollama_status.get("models", [])
-            if available and target_model not in available:
-                target_model = available[0]
+        try:
+            from app.services.providers import get_llm_provider
+            candidate_provider = get_llm_provider(db=db, force_model=model)
+            if getattr(candidate_provider, "provider_name", None) != "unconfigured":
+                provider = candidate_provider
+        except Exception as e:
+            logger.warning(f"Could not initialize active LLM provider for flashcards: {e}")
+            provider = None
 
         seen_questions: Set[str] = set()
         final_cards_data: List[Dict[str, Any]] = []
 
-        if ollama_status["online"]:
-            # Small LLMs perform best when generating batches of 5-10 cards
+        if provider is not None:
+            # LLMs perform best when generating batches of 5-10 cards
             batch_size = 10 if count >= 10 else count
             batches_needed = (count + batch_size - 1) // batch_size
 
@@ -822,18 +808,14 @@ class FlashcardsService:
                     break
 
                 target_batch_count = min(batch_size, count - len(final_cards_data))
-
-                # Partition chunks across batches so questions cover diverse sections
-                # Keep prompt context focused to top 4-5 substantive chunks (around 1,000-1,500 tokens)
-                # This ensures fast local inference on CPU and prevents timeouts
                 total_chunks = len(chunk_data)
                 chunks_per_batch = min(5, max(3, total_chunks // batches_needed + 1))
                 start_c = (batch_num * total_chunks) // batches_needed
                 end_c = min(total_chunks, start_c + chunks_per_batch)
                 context_subset = chunk_data[start_c:end_c] if end_c > start_c else chunk_data[:5]
 
-                batch_cards = self._generate_cards_with_ollama(
-                    base_url=base_url,
+                batch_cards = self._generate_cards_with_llm(
+                    provider=provider,
                     model=target_model,
                     doc_filename=doc.original_filename,
                     context_chunks=context_subset,
@@ -963,19 +945,22 @@ class FlashcardsService:
         # 1. Gather chunks
         chunk_data = self._get_document_chunks_and_validate(db, doc, target_count)
 
-        # 2. Check Local Ollama Status
-        ollama_status = rag_service.check_ollama_status(db=db)
-        base_url = ollama_status["base_url"]
+        # 2. Resolve Active LLM Provider
+        provider = None
         target_model = model or getattr(settings, "DEFAULT_MODEL", "qwen2.5:3b")
-        if ollama_status["online"]:
-            available = ollama_status.get("models", [])
-            if available and target_model not in available:
-                target_model = available[0]
+        try:
+            from app.services.providers import get_llm_provider
+            candidate_provider = get_llm_provider(db=db, force_model=model)
+            if getattr(candidate_provider, "provider_name", None) != "unconfigured":
+                provider = candidate_provider
+        except Exception as e:
+            logger.warning(f"Could not initialize active LLM provider for regenerating deck: {e}")
+            provider = None
 
         seen_questions: Set[str] = set()
         new_cards_data: List[Dict[str, Any]] = []
 
-        if ollama_status["online"]:
+        if provider is not None:
             batch_size = 10 if target_count >= 10 else target_count
             batches_needed = (target_count + batch_size - 1) // batch_size
 
@@ -989,8 +974,8 @@ class FlashcardsService:
                 end_c = min(total_chunks, start_c + chunks_per_batch)
                 context_subset = chunk_data[start_c:end_c] if end_c > start_c else chunk_data[:5]
 
-                batch_cards = self._generate_cards_with_ollama(
-                    base_url=base_url,
+                batch_cards = self._generate_cards_with_llm(
+                    provider=provider,
                     model=target_model,
                     doc_filename=doc.original_filename,
                     context_chunks=context_subset,
@@ -1096,19 +1081,23 @@ class FlashcardsService:
         if not relevant_chunks:
             relevant_chunks = chunk_data[:5]
 
-        ollama_status = rag_service.check_ollama_status(db=db)
-        base_url = ollama_status["base_url"]
+        # Resolve Active LLM Provider
+        provider = None
         target_model = model or getattr(settings, "DEFAULT_MODEL", "qwen2.5:3b")
-        if ollama_status["online"]:
-            available = ollama_status.get("models", [])
-            if available and target_model not in available:
-                target_model = available[0]
+        try:
+            from app.services.providers import get_llm_provider
+            candidate_provider = get_llm_provider(db=db, force_model=model)
+            if getattr(candidate_provider, "provider_name", None) != "unconfigured":
+                provider = candidate_provider
+        except Exception as e:
+            logger.warning(f"Could not initialize active LLM provider for regenerating card: {e}")
+            provider = None
 
         new_cards: List[Dict[str, Any]] = []
 
-        if ollama_status["online"]:
-            new_cards = self._generate_cards_with_ollama(
-                base_url=base_url,
+        if provider is not None:
+            new_cards = self._generate_cards_with_llm(
+                provider=provider,
                 model=target_model,
                 doc_filename=doc.original_filename,
                 context_chunks=relevant_chunks,

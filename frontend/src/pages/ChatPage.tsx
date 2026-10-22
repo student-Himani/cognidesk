@@ -134,10 +134,16 @@ export const ChatPage: React.FC = () => {
     }
   }, [activeThread?.messages, isStreaming]);
 
-  const indexedDocuments = documents.filter(
-    (doc) => doc.status === 'Indexed' || doc.status === 'Processed'
-  );
+  const indexedDocuments = documents.filter((doc) => {
+    const s = (doc.status || '').toLowerCase();
+    return s === 'indexed' || s === 'processed' || s === 'embedded' || s === 'ready';
+  });
+  const processingDocuments = documents.filter((doc) => {
+    const s = (doc.status || '').toLowerCase();
+    return s === 'processing' || s === 'uploaded' || s === 'embedding' || s === 'pending';
+  });
   const hasIndexedDocs = indexedDocuments.length > 0;
+  const isDocumentProcessing = processingDocuments.length > 0;
 
   // Load Ollama status, uploaded documents & SQLite chat history on mount and workspace change
   useEffect(() => {
@@ -857,10 +863,12 @@ export const ChatPage: React.FC = () => {
               <div className="hidden sm:flex items-center space-x-1.5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
                 <span>Knowledge & Context</span>
                 <span>•</span>
-                <span className={ollamaStatus?.online ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-amber-600 dark:text-amber-400 font-semibold'}>
+                <span className={ollamaStatus?.online ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : (ollamaStatus?.is_hosted && !ollamaStatus?.has_cloud_key ? 'text-amber-600 dark:text-amber-400 font-semibold' : 'text-slate-500 dark:text-slate-400 font-semibold')}>
                   {ollamaStatus?.online
-                    ? (ollamaStatus.is_hosted ? (ollamaStatus.mode_label || 'Hosted AI Ready') : 'Local Ollama')
-                    : 'AI Disconnected'}
+                    ? (ollamaStatus.is_hosted ? (ollamaStatus.mode_label || 'Hosted Cloud AI Ready') : 'Local Ollama (Active)')
+                    : (ollamaStatus?.is_hosted && !ollamaStatus?.has_cloud_key
+                        ? 'Cloud AI (Key Required)'
+                        : 'Offline Extractive Mode')}
                 </span>
               </div>
             </div>
@@ -1026,11 +1034,30 @@ export const ChatPage: React.FC = () => {
                           msg.text
                         ) : (isWaitingFirstToken || isStreaming) ? (
                           <AIThinkingIndicator
-                            label="Synthesizing offline AI response..."
-                            sublabel="Querying local neural weights & vector space"
+                            label="Synthesizing AI response..."
+                            sublabel="Querying neural weights & vector space"
                           />
                         ) : null}
                       </div>
+
+                      {/* Actionable Settings Card if API Key or Provider Missing */}
+                      {!isUser && msg.text && (msg.text.includes('No valid LLM provider configured') || msg.text.includes('Cloud provider error') || msg.text.includes('API key') || msg.text.includes('503')) && (
+                        <div className="mt-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex flex-col gap-2">
+                          <div className="font-semibold flex items-center gap-1.5">
+                            <SlidersHorizontal className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                            <span>Cloud AI Configuration Required</span>
+                          </div>
+                          <p className="text-[11px] leading-relaxed">
+                            To generate live conversational responses on this hosted deployment, please configure an API key for Groq (Free tier available), Google Gemini, OpenAI, or Anthropic in Settings.
+                          </p>
+                          <a
+                            href="/settings"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs w-fit transition-colors shadow-xs"
+                          >
+                            Open Settings
+                          </a>
+                        </div>
+                      )}
 
                       {/* Copy Action on AI Message */}
                       {!isUser && msg.text && (
@@ -1170,20 +1197,31 @@ export const ChatPage: React.FC = () => {
           </div>
 
           {/* Warning Banner when Document Chat active but no Indexed Docs exist */}
+          {/* Status Banner when Document Chat active */}
           {chatMode === 'document' && !hasIndexedDocs && (
             <div className="max-w-4xl mx-auto p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 text-xs flex items-center justify-between animate-pop-in">
               <span className="flex items-center gap-2">
-                <WifiOff className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                <span>No indexed documents in active workspace. Click paperclip to index a document.</span>
+                {isDocumentProcessing ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-amber-600 dark:text-amber-400 shrink-0" />
+                ) : (
+                  <WifiOff className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                )}
+                <span>
+                  {isDocumentProcessing
+                    ? 'Document is currently being indexed into ChromaDB. You can already type your questions below.'
+                    : 'No documents indexed in workspace yet. Attach a file using the paperclip or ask general questions.'}
+                </span>
               </span>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="px-2.5 py-1 rounded-lg bg-amber-200/80 hover:bg-amber-200 dark:bg-amber-800/40 dark:hover:bg-amber-700/50 text-amber-900 dark:text-amber-200 font-semibold cursor-pointer shrink-0 text-xs transition-colors"
-              >
-                Upload Document
-              </button>
+              {!isDocumentProcessing && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="px-2.5 py-1 rounded-lg bg-amber-200/80 hover:bg-amber-200 dark:bg-amber-800/40 dark:hover:bg-amber-700/50 text-amber-900 dark:text-amber-200 font-semibold cursor-pointer shrink-0 text-xs transition-colors"
+                >
+                  Upload Document
+                </button>
+              )}
             </div>
           )}
 
@@ -1222,13 +1260,17 @@ export const ChatPage: React.FC = () => {
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 rows={1}
-                disabled={chatMode === 'document' ? (!hasIndexedDocs || isStreaming) : isStreaming}
+                disabled={isStreaming}
                 placeholder={
-                  chatMode === 'normal'
+                  isStreaming
+                    ? 'AI is generating response...'
+                    : chatMode === 'normal'
                     ? 'Ask anything (Normal Chat mode)...'
                     : hasIndexedDocs
                     ? 'Ask anything about your documents (ChromaDB RAG)...'
-                    : 'Document Chat disabled. Click paperclip to upload a file...'
+                    : isDocumentProcessing
+                    ? 'Indexing document... You can prepare your question here.'
+                    : 'Ask anything, or attach a document using the paperclip...'
                 }
                 className="flex-1 bg-transparent text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none text-xs md:text-sm py-1.5 leading-relaxed resize-none max-h-40 overflow-y-auto scrollbar-thin disabled:opacity-50 disabled:cursor-not-allowed"
               />
@@ -1236,7 +1278,7 @@ export const ChatPage: React.FC = () => {
               {/* Send Button with micro-animation */}
               <button
                 type="submit"
-                disabled={!input.trim() || isStreaming || (chatMode === 'document' && !hasIndexedDocs)}
+                disabled={!input.trim() || isStreaming}
                 className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center shadow-md shadow-blue-500/25 transition-all cursor-pointer shrink-0 mb-0.5 hover:scale-105 active:scale-95"
                 title="Send Message (Enter to send, Shift+Enter for new line)"
               >

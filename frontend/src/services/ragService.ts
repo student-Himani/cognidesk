@@ -47,6 +47,11 @@ export interface OllamaStatusData {
   is_hosted?: boolean;
   provider?: string;
   mode_label?: string;
+  active_model?: string;
+  details?: string;
+  cloud_provider?: string;
+  cloud_model?: string;
+  has_cloud_key?: boolean;
 }
 
 export interface OllamaStatusResponse {
@@ -217,6 +222,9 @@ export const streamRagQuery = (
                 });
               } else if (parsed.type === 'token') {
                 onToken(parsed.token);
+              } else if (parsed.type === 'error') {
+                onError(new Error(parsed.error || 'AI generation error'));
+                return;
               } else if (parsed.type === 'done') {
                 onDone();
               }

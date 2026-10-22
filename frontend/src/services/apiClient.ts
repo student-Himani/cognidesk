@@ -97,20 +97,46 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    const errorMessage =
-      error.response?.data?.error?.message ||
-      error.response?.data?.detail ||
-      error.message ||
-      'An unexpected network error occurred';
+    const config = error.config || {};
+    const url = config.url || '';
 
-    // Dispatch global toast error
-    store.dispatch(
-      addToast({
-        type: 'error',
-        title: 'API Request Error',
-        message: errorMessage,
-      })
-    );
+    // Silence global error toast for background probes or callers that requested skipGlobalToast
+    const isProbe = url.includes('/rag/status') || url.includes('/health') || url.includes('/settings');
+    const skipToast = (config as any).skipGlobalToast || config.headers?.['X-Skip-Global-Toast'] || isProbe;
+
+    if (!skipToast) {
+      let rawMsg =
+        error.response?.data?.error?.message ||
+        error.response?.data?.detail ||
+        error.message ||
+        'An unexpected network error occurred';
+
+      let errorMessage = typeof rawMsg === 'string' ? rawMsg : JSON.stringify(rawMsg);
+      let errorTitle = 'API Request Error';
+      let toastType: 'error' | 'warning' | 'info' = 'error';
+
+      // Provide clear friendly guidance if backend is waking up or temporarily unavailable
+      if (!error.response || error.code === 'ERR_NETWORK') {
+        errorTitle = 'Connection Notice';
+        toastType = 'warning';
+        errorMessage = 'Backend instance is starting up (~30s Render cold-start). Please wait a moment...';
+      } else if (error.response?.status === 503) {
+        errorTitle = 'Service Notice';
+        toastType = 'warning';
+        if (errorMessage.includes('No valid LLM provider configured')) {
+          errorMessage = 'Cloud AI key is not yet configured. Please set your Groq, Gemini, or OpenAI API key in Settings.';
+        }
+      }
+
+      // Dispatch global toast error
+      store.dispatch(
+        addToast({
+          type: toastType,
+          title: errorTitle,
+          message: errorMessage,
+        })
+      );
+    }
 
     return Promise.reject(error);
   }

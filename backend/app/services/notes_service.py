@@ -173,39 +173,23 @@ class NotesService:
             f"Generate structured study notes with a dedicated '# 📚 Source Citations' section based strictly on the above content."
         )
 
-        # 4. Ollama Inference
-        target_model = model or getattr(settings, "DEFAULT_MODEL", "qwen2.5:3b")
-        ollama_status = rag_service.check_ollama_status()
-        base_url = ollama_status["base_url"]
+        # 4. LLM Inference (Supports Hosted Groq/Gemini/OpenAI/Anthropic & Local Ollama)
         generated_markdown = ""
-
-        if ollama_status["online"]:
-            available_models = ollama_status.get("models", [])
-            if available_models and target_model not in available_models:
-                logger.info(f"Requested model '{target_model}' not installed in Ollama. Using '{available_models[0]}'.")
-                target_model = available_models[0]
-
-            try:
-                payload = {
-                    "model": target_model,
-                    "prompt": user_prompt,
-                    "system": system_prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.2,
-                        "num_predict": 600,
-                        "num_ctx": 4096
-                    }
-                }
-                custom_timeout = httpx.Timeout(120.0, connect=15.0, read=120.0, write=120.0)
-                with httpx.Client(timeout=custom_timeout) as client:
-                    res = client.post(f"{base_url}/api/generate", json=payload)
-                    if res.status_code == 200:
-                        generated_markdown = res.json().get("response", "").strip()
-                    else:
-                        logger.warning(f"Ollama returned HTTP {res.status_code}: {res.text}")
-            except Exception as e:
-                logger.warning(f"Failed to generate note with Ollama: {e}")
+        try:
+            from app.services.providers import get_llm_provider
+            provider = get_llm_provider(db=db, force_model=model)
+            if provider.provider_name != "unconfigured":
+                llm_res = provider.generate(
+                    prompt=user_prompt,
+                    system=system_prompt,
+                    model=model,
+                    temperature=0.2,
+                    max_tokens=2048
+                )
+                if llm_res and llm_res.text:
+                    generated_markdown = llm_res.text.strip()
+        except Exception as e:
+            logger.warning(f"AI note generation provider notice: {e}")
 
         # Ensure citations section is present in generated markdown
         if generated_markdown and "# 📚" not in generated_markdown and "Citation" not in generated_markdown:

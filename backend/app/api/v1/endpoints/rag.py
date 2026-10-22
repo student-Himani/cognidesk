@@ -1,3 +1,4 @@
+import os
 import logging
 from typing import List, Optional, Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,8 +10,9 @@ from app.core.db import get_db
 from app.core.auth_deps import get_current_user_optional, verify_workspace_access
 from app.models.user import User
 from app.models.document import Document
+from app.core.config import settings
 from app.services.rag_service import rag_service
-from app.services.providers import OfflineModeEnforcedError
+from app.services.providers import OfflineModeEnforcedError, CloudProviderError
 from app.models.setting import AppSetting
 
 logger = logging.getLogger("app")
@@ -65,6 +67,12 @@ def query_rag_pipeline(
             "message": "RAG pipeline response generated successfully.",
             "data": result
         }
+    except CloudProviderError as cpe:
+        logger.warning(f"Cloud provider error during query: {cpe}")
+        raise HTTPException(
+            status_code=cpe.status_code or status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(cpe)
+        )
     except OfflineModeEnforcedError as ome:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -99,13 +107,14 @@ def stream_rag_pipeline(
             if doc.workspace_id:
                 verify_workspace_access(doc.workspace_id, current_user, db)
 
-    # Upfront check: if Cloud AI is configured but offline mode is active, reject immediately
-    setting = db.query(AppSetting).filter(AppSetting.id == 1).first()
-    if setting and setting.is_offline_mode and setting.ai_provider == "cloud":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Offline Mode is strictly enforced. Cloud AI requests are rejected with zero network calls."
-        )
+    # Upfront check: if Cloud AI is configured but offline mode is active on local machine, reject immediately
+    if not settings.is_hosted():
+        setting = db.query(AppSetting).filter(AppSetting.id == 1).first()
+        if setting and setting.is_offline_mode and setting.ai_provider == "cloud":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Offline Mode is strictly enforced. Cloud AI requests are rejected with zero network calls."
+            )
 
     try:
         generator = rag_service.generate_streaming_response(
@@ -120,6 +129,12 @@ def stream_rag_pipeline(
             messages=payload.messages
         )
         return StreamingResponse(generator, media_type="text/event-stream")
+    except CloudProviderError as cpe:
+        logger.warning(f"Cloud provider error starting stream: {cpe}")
+        raise HTTPException(
+            status_code=cpe.status_code or status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(cpe)
+        )
     except OfflineModeEnforcedError as ome:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -1,3 +1,4 @@
+import os
 import json
 import time
 import logging
@@ -70,6 +71,49 @@ class RAGPipelineService:
             document_ids=document_ids,
             min_score=min_score
         )
+
+        # Fallback to exact keyword / full-text search in SQLite chunks if semantic search returned no results
+        if not results:
+            logger.info("Semantic search returned no results; falling back to SQLite full-text search.")
+            results = search_service.search_fulltext(
+                db=db,
+                query_text=query,
+                top_k=effective_top_k,
+                filetype=filetype,
+                document_ids=document_ids
+            )
+
+        # If a single document is targeted and still no results, retrieve the document's top chunks directly
+        if not results and document_ids and len(document_ids) == 1:
+            logger.info(f"Retrieving top chunks directly for target document ID {document_ids[0]}.")
+            doc = db.query(Document).filter(Document.id == document_ids[0]).first()
+            if doc:
+                doc_chunks = (
+                    db.query(DocumentChunk)
+                    .filter(DocumentChunk.document_id == doc.id)
+                    .order_by(DocumentChunk.chunk_index.asc())
+                    .limit(effective_top_k)
+                    .all()
+                )
+                for dc in doc_chunks:
+                    results.append({
+                        "id": f"chunk_{dc.id}",
+                        "document_id": doc.id,
+                        "title": doc.original_filename or doc.filename,
+                        "snippet": dc.chunk_text,
+                        "score": "Direct Match",
+                        "similarity_score": 1.0,
+                        "distance": 0.0,
+                        "chunkIndex": f"Chunk #{dc.chunk_index + 1}",
+                        "docType": (doc.filetype or "").upper(),
+                        "citation": {
+                            "document_id": doc.id,
+                            "filename": doc.original_filename or doc.filename,
+                            "filetype": (doc.filetype or "").upper(),
+                            "chunk_index": f"Chunk #{dc.chunk_index + 1}"
+                        }
+                    })
+
         return results
 
     @staticmethod
@@ -218,14 +262,33 @@ class RAGPipelineService:
                 pass
 
         has_hosted = getattr(settings, "is_hosted", lambda: False)()
+
+        # Check for DB custom key
+        db_has_key = False
+        db_provider = "openai"
+        db_model = "gpt-4o-mini"
+        if db is not None:
+            try:
+                from app.models.setting import AppSetting
+                st = db.query(AppSetting).filter(AppSetting.id == 1).first()
+                if st and st.cloud_api_key and st.cloud_api_key.strip():
+                    db_has_key = True
+                    db_provider = st.cloud_provider or "openai"
+                    db_model = st.cloud_model or "gpt-4o-mini"
+            except Exception:
+                pass
+
         has_keys = bool(
             getattr(settings, "GROQ_API_KEY", None) or
+            getattr(settings, "GEMINI_API_KEY", None) or
             getattr(settings, "OPENAI_API_KEY", None) or
             getattr(settings, "ANTHROPIC_API_KEY", None) or
-            getattr(settings, "OPENROUTER_API_KEY", None)
+            getattr(settings, "OPENROUTER_API_KEY", None) or
+            os.environ.get("GEMINI_API_KEY") or
+            db_has_key
         )
 
-        if has_hosted:
+        if has_hosted or db_has_key:
             if not has_keys:
                 return {
                     "online": False,
@@ -234,32 +297,45 @@ class RAGPipelineService:
                     "provider": "unconfigured",
                     "base_url": "",
                     "models": [],
-                    "mode_label": "Hosted AI (Setup Required)",
-                    "setup_message": "No hosted AI provider API key is configured. Add GROQ_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY in Render environment variables."
+                    "mode_label": "Cloud AI (Key Required)",
+                    "setup_message": "No hosted AI provider API key is configured. Add GROQ_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY in Render environment variables or configure in Settings."
                 }
-            provider_name = getattr(settings, "HOSTED_LLM_PROVIDER", None) or (
-                "groq" if getattr(settings, "GROQ_API_KEY", None) else (
-                    "openrouter" if getattr(settings, "OPENROUTER_API_KEY", None) else (
-                        "openai" if getattr(settings, "OPENAI_API_KEY", None) else (
-                            "anthropic" if getattr(settings, "ANTHROPIC_API_KEY", None) else "hosted"
+            provider_name = (
+                db_provider if db_has_key else (
+                    getattr(settings, "HOSTED_LLM_PROVIDER", None) or (
+                        "gemini" if (getattr(settings, "GEMINI_API_KEY", None) or os.environ.get("GEMINI_API_KEY")) else (
+                            "groq" if getattr(settings, "GROQ_API_KEY", None) else (
+                                "openrouter" if getattr(settings, "OPENROUTER_API_KEY", None) else (
+                                    "openai" if getattr(settings, "OPENAI_API_KEY", None) else (
+                                        "anthropic" if getattr(settings, "ANTHROPIC_API_KEY", None) else "cloud"
+                                    )
+                                )
+                            )
                         )
                     )
                 )
             )
-            model_name = getattr(settings, "HOSTED_LLM_MODEL", None) or (
-                "llama-3.3-70b-versatile" if provider_name == "groq" else (
-                    "gpt-4o-mini" if provider_name == "openai" else (
-                        "claude-3-5-sonnet-20241022" if provider_name == "anthropic" else "hosted-model"
+            model_name = (
+                db_model if db_has_key else (
+                    getattr(settings, "HOSTED_LLM_MODEL", None) or (
+                        "gemini-1.5-flash" if provider_name == "gemini" else (
+                            "llama-3.3-70b-versatile" if provider_name == "groq" else (
+                                "gpt-4o-mini" if provider_name == "openai" else (
+                                    "claude-3-5-sonnet-20241022" if provider_name == "anthropic" else "hosted-model"
+                                )
+                            )
+                        )
                     )
                 )
             )
             return {
                 "online": True,
                 "is_hosted": True,
+                "unconfigured": False,
                 "provider": provider_name,
                 "base_url": getattr(settings, "HOSTED_LLM_BASE_URL", None) or f"https://api.{provider_name}.com",
                 "models": [model_name, "default"],
-                "mode_label": f"Hosted AI ({provider_name.title()})"
+                "mode_label": f"Cloud AI ({provider_name.title()})"
             }
 
         default_base = configured_url or getattr(settings, "OLLAMA_BASE_URL", "http://127.0.0.1:11434")
@@ -359,16 +435,17 @@ class RAGPipelineService:
             answer_text = llm_res.text
             target_model = llm_res.model
             used_ollama = (provider.provider_name == "ollama")
-        except CloudProviderError as cpe:
-            logger.warning(f"Provider '{provider.provider_name}' error: {cpe}")
-            answer_text = str(cpe)
-            target_model = model or getattr(provider, "model", "unknown")
-            used_ollama = False
+        except CloudProviderError:
+            raise
+        except OfflineModeEnforcedError:
+            raise
         except Exception as e:
             logger.error(f"Unexpected generation error ({provider.provider_name}): {e}")
-            answer_text = f"LLM Generation Error ({provider.provider_name}): {str(e)}"
-            target_model = model or getattr(provider, "model", "unknown")
-            used_ollama = False
+            raise CloudProviderError(
+                f"LLM Generation Error ({provider.provider_name}): {str(e)}",
+                status_code=500,
+                provider=provider.provider_name
+            )
 
         elapsed_ms = round((time.time() - start_time) * 1000, 2)
 
@@ -491,11 +568,23 @@ class RAGPipelineService:
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
         except CloudProviderError as cpe:
             logger.warning(f"Provider {provider.provider_name} streaming error: {cpe}")
-            yield f"data: {json.dumps({'type': 'token', 'token': str(cpe)})}\n\n"
+            error_event = {
+                "type": "error",
+                "error": str(cpe),
+                "status_code": getattr(cpe, "status_code", 503) or 503,
+                "provider": getattr(cpe, "provider", provider.provider_name)
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
         except Exception as e:
             logger.error(f"Unexpected streaming error ({provider.provider_name}): {e}")
-            yield f"data: {json.dumps({'type': 'token', 'token': f'Error: {str(e)}'})}\n\n"
+            error_event = {
+                "type": "error",
+                "error": f"Error: {str(e)}",
+                "status_code": 500,
+                "provider": provider.provider_name
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
 

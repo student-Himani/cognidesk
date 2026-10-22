@@ -146,13 +146,14 @@ class Settings(BaseSettings):
     ]
 
     # Hosted Cloud AI Providers (Configured securely via backend environment)
-    HOSTED_LLM_PROVIDER: Optional[str] = None  # "openai" | "anthropic" | "groq" | "openrouter" | "ollama"
-    HOSTED_LLM_MODEL: Optional[str] = None     # e.g. "gpt-4o-mini", "llama-3.3-70b-versatile"
+    HOSTED_LLM_PROVIDER: Optional[str] = None  # "openai" | "anthropic" | "groq" | "openrouter" | "gemini" | "ollama"
+    HOSTED_LLM_MODEL: Optional[str] = None     # e.g. "gpt-4o-mini", "llama-3.3-70b-versatile", "gemini-1.5-flash"
     HOSTED_LLM_BASE_URL: Optional[str] = None  # e.g. custom OpenAI-compatible endpoint
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
     OPENROUTER_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
 
     # Local Ollama Fallback Settings
     OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
@@ -212,7 +213,9 @@ class Settings(BaseSettings):
             or self.ANTHROPIC_API_KEY
             or self.GROQ_API_KEY
             or self.OPENROUTER_API_KEY
+            or self.GEMINI_API_KEY
             or self.HOSTED_LLM_PROVIDER
+            or os.environ.get("GEMINI_API_KEY")
             or os.environ.get("COGNIDESK_HOSTED_MODE") == "1"
             or os.environ.get("RENDER") == "true"
             or os.environ.get("RAILWAY_ENVIRONMENT")

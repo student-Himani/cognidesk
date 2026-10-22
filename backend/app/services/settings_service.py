@@ -203,12 +203,24 @@ class SettingsService:
 
         prov_name = (provider or record.cloud_provider or "anthropic").lower().strip()
         
-        # Resolve API key: provided or stored
+        # Resolve API key: provided, stored in SQLite, or from backend environment variables
         real_key = None
         if api_key and not ("••••" in api_key or "****" in api_key):
             real_key = api_key.strip()
         else:
             real_key = record.cloud_api_key
+
+        if not real_key:
+            if prov_name == "gemini" and getattr(settings, "GEMINI_API_KEY", None):
+                real_key = settings.GEMINI_API_KEY
+            elif prov_name == "groq" and getattr(settings, "GROQ_API_KEY", None):
+                real_key = settings.GROQ_API_KEY
+            elif prov_name == "openai" and getattr(settings, "OPENAI_API_KEY", None):
+                real_key = settings.OPENAI_API_KEY
+            elif prov_name == "anthropic" and getattr(settings, "ANTHROPIC_API_KEY", None):
+                real_key = settings.ANTHROPIC_API_KEY
+            elif prov_name == "openrouter" and getattr(settings, "OPENROUTER_API_KEY", None):
+                real_key = settings.OPENROUTER_API_KEY
 
         if not real_key:
             return {
@@ -222,6 +234,18 @@ class SettingsService:
             target_model = model or record.cloud_model or "claude-sonnet-4-5"
             target_url = base_url or record.cloud_base_url or "https://api.anthropic.com"
             p = AnthropicProvider(api_key=real_key, model=target_model, base_url=target_url)
+            return p.test_connection()
+        elif prov_name == "gemini":
+            from app.services.providers.openai_provider import OpenAIProvider
+            target_model = model or record.cloud_model or "gemini-1.5-flash"
+            target_url = base_url or ("https://generativelanguage.googleapis.com/v1beta/openai/" if not record.cloud_base_url or "api.openai.com" in record.cloud_base_url else record.cloud_base_url)
+            p = OpenAIProvider(api_key=real_key, model=target_model, base_url=target_url)
+            return p.test_connection()
+        elif prov_name == "groq":
+            from app.services.providers.openai_provider import OpenAIProvider
+            target_model = model or record.cloud_model or "llama-3.3-70b-versatile"
+            target_url = base_url or ("https://api.groq.com/openai/v1" if not record.cloud_base_url or "api.openai.com" in record.cloud_base_url else record.cloud_base_url)
+            p = OpenAIProvider(api_key=real_key, model=target_model, base_url=target_url)
             return p.test_connection()
         else:
             from app.services.providers.openai_provider import OpenAIProvider

@@ -12,9 +12,13 @@ from app.models.document_chunk import DocumentChunk
 
 logger = logging.getLogger("app")
 
-# Ensure HuggingFace / Transformers prefer local files without throwing network errors offline
-os.environ.setdefault("HF_HUB_OFFLINE", "1")
-os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+# If running in hosted environment, allow HuggingFace downloading. In local offline desktop mode, default to offline cache.
+if not settings.is_hosted():
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+else:
+    os.environ.pop("HF_HUB_OFFLINE", None)
+    os.environ.pop("TRANSFORMERS_OFFLINE", None)
 
 # Lazy loader for sentence_transformers (avoids heavy PyTorch/Transformers import at server startup)
 _SentenceTransformer = None
@@ -28,6 +32,24 @@ def get_sentence_transformer_cls():
         except ImportError:
             _SentenceTransformer = False
     return _SentenceTransformer if _SentenceTransformer is not False else None
+
+
+def generate_fallback_embedding(text: str, dim: int = 384) -> List[float]:
+    """Generates a deterministic 384-dimensional normalized vector from text when transformer models cannot run."""
+    import math
+    vec = [0.0] * dim
+    words = re.findall(r"\w+", text.lower())
+    if not words:
+        words = ["empty"]
+    for word in words:
+        h = int(hashlib.md5(word.encode("utf-8")).hexdigest(), 16)
+        idx = h % dim
+        sign = 1.0 if ((h >> 8) & 1) else -1.0
+        vec[idx] += sign
+    norm = math.sqrt(sum(x * x for x in vec))
+    if norm > 0:
+        vec = [x / norm for x in vec]
+    return vec
 
 
 class EmbeddingEngine:
@@ -214,19 +236,24 @@ class EmbeddingEngine:
 
         # 2. Compute embeddings for cache misses in batches
         if uncached_texts:
-            model = self.get_model()
-            logger.info(f"Computing embeddings for {len(uncached_texts)} chunk(s) (Batch Size: {b_size})...")
-            
-            # SentenceTransformer encode
-            embeddings_array = model.encode(
-                uncached_texts,
-                batch_size=b_size,
-                show_progress_bar=False,
-                convert_to_numpy=True
-            )
+            embeddings_array = None
+            try:
+                model = self.get_model()
+                logger.info(f"Computing embeddings for {len(uncached_texts)} chunk(s) (Batch Size: {b_size})...")
+                embeddings_array = model.encode(
+                    uncached_texts,
+                    batch_size=b_size,
+                    show_progress_bar=False,
+                    convert_to_numpy=True
+                )
+            except Exception as e:
+                logger.warning(f"SentenceTransformer encoding unavailable or failed ({e}); using deterministic dense embedding fallback.")
+                embeddings_array = [generate_fallback_embedding(t, 384) for t in uncached_texts]
 
             for idx_in_uncached, orig_idx in enumerate(uncached_indices):
-                vec = embeddings_array[idx_in_uncached].tolist()
+                vec = embeddings_array[idx_in_uncached]
+                if hasattr(vec, "tolist"):
+                    vec = vec.tolist()
                 results[orig_idx] = vec
                 
                 # Store in cache

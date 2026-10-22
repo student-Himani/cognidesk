@@ -763,7 +763,10 @@ export const SettingsPage: React.FC = () => {
                           const newProv = e.target.value;
                           setCloudProvider(newProv);
                           setCloudTestResult(null);
-                          if (newProv === 'anthropic') {
+                          if (newProv === 'gemini') {
+                            setCloudModel('gemini-1.5-flash');
+                            setCloudBaseUrl('https://generativelanguage.googleapis.com/v1beta/openai/');
+                          } else if (newProv === 'anthropic') {
                             if (!cloudModel || cloudModel.startsWith('gpt-') || cloudModel.startsWith('o3-')) {
                               setCloudModel('claude-sonnet-4-5');
                             }
@@ -788,6 +791,7 @@ export const SettingsPage: React.FC = () => {
                         className="w-full bg-slate-50 dark:bg-[#131c2e] border border-slate-300 dark:border-blue-900/50 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:border-blue-500"
                       >
                         <option value="groq">Groq (Ultra-Fast Inference)</option>
+                        <option value="gemini">Google Gemini (Gemini 1.5 Flash / Pro)</option>
                         <option value="openrouter">OpenRouter (Unified Models)</option>
                         <option value="anthropic">Anthropic Claude</option>
                         <option value="openai">OpenAI</option>
@@ -799,7 +803,17 @@ export const SettingsPage: React.FC = () => {
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-400 block mb-1.5">
                         Cloud Model
                       </label>
-                      {cloudProvider === 'anthropic' ? (
+                      {cloudProvider === 'gemini' ? (
+                        <select
+                          value={cloudModel}
+                          onChange={(e) => setCloudModel(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-[#131c2e] border border-slate-300 dark:border-blue-900/50 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast & Recommended)</option>
+                          <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                          <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        </select>
+                      ) : cloudProvider === 'anthropic' ? (
                         <select
                           value={cloudModel}
                           onChange={(e) => setCloudModel(e.target.value)}
@@ -849,7 +863,7 @@ export const SettingsPage: React.FC = () => {
                         type="text"
                         value={cloudBaseUrl}
                         onChange={(e) => setCloudBaseUrl(e.target.value)}
-                        placeholder={cloudProvider === 'anthropic' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1'}
+                        placeholder={cloudProvider === 'anthropic' ? 'https://api.anthropic.com' : cloudProvider === 'gemini' ? 'https://generativelanguage.googleapis.com/v1beta/openai/' : 'https://api.openai.com/v1'}
                         className="w-full bg-slate-50 dark:bg-[#131c2e] border border-slate-300 dark:border-blue-900/50 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500 shadow-sm"
                       />
                     </div>

@@ -1,3 +1,4 @@
+import os
 import logging
 from typing import Optional, Generator, Dict, Any
 from sqlalchemy.orm import Session
@@ -14,17 +15,16 @@ logger = logging.getLogger("app")
 
 class UnconfiguredHostedProvider(BaseLLMProvider):
     """
-    Fallback provider when running in hosted mode without server-side API keys configured.
-    Provides clear, informative setup instructions instead of crashing or attempting connection to local Ollama.
+    Fallback provider when running in hosted mode without server-side or database API keys configured.
+    Provides clear, informative setup instructions via structured CloudProviderError instead of returning fake success responses.
     """
     SETUP_MESSAGE = (
         "CogniDesk Hosted AI Setup Required:\n\n"
-        "No hosted AI provider API key is currently configured on this server.\n\n"
+        "No hosted AI provider API key is currently configured on this server or in settings.\n\n"
         "To enable live server-side AI answers:\n"
-        "1. Open your Render dashboard for this backend service.\n"
-        "2. Add GROQ_API_KEY (recommended, free fast tier), OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY to Environment Variables.\n"
-        "3. (Optional) Set HOSTED_LLM_PROVIDER to 'groq' and HOSTED_LLM_MODEL to 'llama-3.3-70b-versatile'.\n\n"
-        "Alternatively, switch to offline mode in the application to use the built-in browser-based local model."
+        "1. Open your Render dashboard for this backend service and add GROQ_API_KEY (recommended, free fast tier), GEMINI_API_KEY, or OPENAI_API_KEY to Environment Variables.\n"
+        "2. Alternatively, enter your custom API key in the application under Settings -> Cloud AI.\n"
+        "3. Or run local Ollama (`ollama serve`) on your laptop for local offline execution."
     )
 
     @property
@@ -40,11 +40,10 @@ class UnconfiguredHostedProvider(BaseLLMProvider):
         max_tokens: int = 2048,
         **kwargs
     ) -> LLMResponse:
-        return LLMResponse(
-            text=self.SETUP_MESSAGE,
-            model="unconfigured",
-            provider="hosted-unconfigured",
-            finish_reason="stop"
+        raise CloudProviderError(
+            self.SETUP_MESSAGE,
+            status_code=503,
+            provider="unconfigured"
         )
 
     def stream_generate(
@@ -56,12 +55,16 @@ class UnconfiguredHostedProvider(BaseLLMProvider):
         max_tokens: int = 2048,
         **kwargs
     ) -> Generator[str, None, None]:
-        yield self.SETUP_MESSAGE
+        raise CloudProviderError(
+            self.SETUP_MESSAGE,
+            status_code=503,
+            provider="unconfigured"
+        )
 
     def test_connection(self) -> Dict[str, Any]:
         return {
             "connected": False,
-            "message": "Hosted AI provider API key is not configured in server environment."
+            "message": "Hosted AI provider API key is not configured in server environment or database settings."
         }
 
 
@@ -92,6 +95,15 @@ def get_llm_provider(
     server_provider = (settings.HOSTED_LLM_PROVIDER or "").lower().strip()
     server_model = force_model or settings.HOSTED_LLM_MODEL
     server_base_url = settings.HOSTED_LLM_BASE_URL
+
+    # Gemini server configuration
+    gemini_key = getattr(settings, "GEMINI_API_KEY", None) or os.environ.get("GEMINI_API_KEY")
+    if gemini_key and (server_provider in ("gemini", "google", "") or not server_provider):
+        return OpenAIProvider(
+            api_key=gemini_key,
+            model=server_model or "gemini-1.5-flash",
+            base_url=server_base_url or "https://generativelanguage.googleapis.com/v1beta/openai/"
+        )
 
     # Groq server configuration
     if settings.GROQ_API_KEY and (server_provider in ("groq", "openai", "") or not server_provider):
@@ -144,25 +156,45 @@ def get_llm_provider(
     cloud_base_url = getattr(setting, "cloud_base_url", None)
 
     # 3. Enforce Offline Mode for local desktop execution
-    is_cloud = (ai_provider in ("cloud", "anthropic", "openai", "groq", "openrouter"))
+    is_cloud = (ai_provider in ("cloud", "anthropic", "openai", "groq", "openrouter", "gemini"))
     if is_offline and is_cloud:
         raise OfflineModeEnforcedError(
             "Offline Mode is strictly enforced. Cloud AI requests are rejected with zero network calls. "
             "Switch to Online Mode in Settings to enable external AI providers."
         )
 
-    # 4. User-Configured Custom Cloud Provider
+    # 4. User-Configured Custom Cloud Provider from Database Settings
     if is_cloud and cloud_api_key:
-        is_anthropic = (ai_provider == "anthropic") or (ai_provider == "cloud" and cloud_provider_name == "anthropic")
-        if is_anthropic:
+        if cloud_provider_name == "anthropic" or ai_provider == "anthropic":
             base_url = cloud_base_url if cloud_base_url and "api.anthropic.com" in cloud_base_url else "https://api.anthropic.com"
             return AnthropicProvider(
                 api_key=cloud_api_key,
-                model=cloud_model or "claude-sonnet-4-5",
+                model=cloud_model or "claude-3-5-sonnet-20241022",
+                base_url=base_url
+            )
+        elif cloud_provider_name == "gemini" or ai_provider == "gemini":
+            base_url = cloud_base_url if cloud_base_url and "googleapis.com" in cloud_base_url else "https://generativelanguage.googleapis.com/v1beta/openai/"
+            return OpenAIProvider(
+                api_key=cloud_api_key,
+                model=cloud_model or "gemini-1.5-flash",
+                base_url=base_url
+            )
+        elif cloud_provider_name == "groq" or ai_provider == "groq":
+            base_url = cloud_base_url if cloud_base_url and "groq.com" in cloud_base_url else "https://api.groq.com/openai/v1"
+            return OpenAIProvider(
+                api_key=cloud_api_key,
+                model=cloud_model or "llama-3.3-70b-versatile",
+                base_url=base_url
+            )
+        elif cloud_provider_name == "openrouter" or ai_provider == "openrouter":
+            base_url = cloud_base_url if cloud_base_url and "openrouter.ai" in cloud_base_url else "https://openrouter.ai/api/v1"
+            return OpenAIProvider(
+                api_key=cloud_api_key,
+                model=cloud_model or "meta-llama/llama-3.3-70b-instruct",
                 base_url=base_url
             )
         else:
-            base_url = cloud_base_url if cloud_base_url and "api.openai.com" in cloud_base_url else "https://api.openai.com/v1"
+            base_url = cloud_base_url if cloud_base_url else "https://api.openai.com/v1"
             return OpenAIProvider(
                 api_key=cloud_api_key,
                 model=cloud_model or "gpt-4o-mini",

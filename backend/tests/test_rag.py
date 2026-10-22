@@ -22,7 +22,18 @@ def test_rag_status_endpoint():
     assert "models" in data["data"]
 
 
-def test_rag_query_normal_mode():
+def test_rag_query_normal_mode(monkeypatch):
+    from app.services.providers.base import LLMResponse
+    from app.services.providers.ollama_provider import OllamaProvider
+    monkeypatch.setattr(
+        OllamaProvider,
+        "generate",
+        lambda self, prompt, **kwargs: LLMResponse(
+            text="Polymorphism is an object-oriented programming concept where a single interface can represent different underlying forms.",
+            model="qwen2.5:3b",
+            provider="ollama"
+        )
+    )
     payload = {
         "query": "What is polymorphism in Java?",
         "mode": "normal",
@@ -36,7 +47,18 @@ def test_rag_query_normal_mode():
     assert data["data"]["citations"] == []
 
 
-def test_rag_query_document_mode_empty():
+def test_rag_query_document_mode_empty(monkeypatch):
+    from app.services.providers.base import LLMResponse
+    from app.services.providers.ollama_provider import OllamaProvider
+    monkeypatch.setattr(
+        OllamaProvider,
+        "generate",
+        lambda self, prompt, **kwargs: LLMResponse(
+            text="Superposition is a principle of quantum mechanics.",
+            model="qwen2.5:3b",
+            provider="ollama"
+        )
+    )
     payload = {
         "query": "What is superposition?",
         "mode": "document",
