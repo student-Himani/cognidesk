@@ -34,24 +34,6 @@ def get_sentence_transformer_cls():
     return _SentenceTransformer if _SentenceTransformer is not False else None
 
 
-def generate_fallback_embedding(text: str, dim: int = 384) -> List[float]:
-    """Generates a deterministic 384-dimensional normalized vector from text when transformer models cannot run."""
-    import math
-    vec = [0.0] * dim
-    words = re.findall(r"\w+", text.lower())
-    if not words:
-        words = ["empty"]
-    for word in words:
-        h = int(hashlib.md5(word.encode("utf-8")).hexdigest(), 16)
-        idx = h % dim
-        sign = 1.0 if ((h >> 8) & 1) else -1.0
-        vec[idx] += sign
-    norm = math.sqrt(sum(x * x for x in vec))
-    if norm > 0:
-        vec = [x / norm for x in vec]
-    return vec
-
-
 class EmbeddingEngine:
     """
     Module 06: Embedding Engine Service.
@@ -247,20 +229,21 @@ class EmbeddingEngine:
                     convert_to_numpy=True
                 )
             except Exception as e:
-                logger.warning(f"SentenceTransformer encoding unavailable or failed ({e}); using deterministic dense embedding fallback.")
-                embeddings_array = [generate_fallback_embedding(t, 384) for t in uncached_texts]
+                logger.warning(f"SentenceTransformer encoding unavailable or failed ({e}); falling back cleanly to full-text lexical search.")
+                embeddings_array = [None] * len(uncached_texts)
 
             for idx_in_uncached, orig_idx in enumerate(uncached_indices):
                 vec = embeddings_array[idx_in_uncached]
-                if hasattr(vec, "tolist"):
+                if vec is not None and hasattr(vec, "tolist"):
                     vec = vec.tolist()
                 results[orig_idx] = vec
                 
-                # Store in cache
-                t_hash = self._compute_text_hash(texts[orig_idx], model_name)
-                self._cache[t_hash] = vec
+                # Store in cache only if valid embedding
+                if vec is not None:
+                    t_hash = self._compute_text_hash(texts[orig_idx], model_name)
+                    self._cache[t_hash] = vec
 
-        return [r for r in results if r is not None]
+        return results
 
     def process_document_embedding(self, db: Session, document_id: int) -> Tuple[int, int]:
         """
@@ -330,7 +313,9 @@ class EmbeddingEngine:
                     "doc_metadata": doc_metadata
                 }
 
-                emb_vec = embeddings[idx] if idx < len(embeddings) else []
+                emb_vec = embeddings[idx] if idx < len(embeddings) else None
+                emb_json = json.dumps(emb_vec) if emb_vec is not None else None
+                effective_model = model_name if emb_vec is not None else "fulltext-search"
 
                 chunk_obj = DocumentChunk(
                     document_id=doc.id,
@@ -340,8 +325,8 @@ class EmbeddingEngine:
                     end_char=c["end_char"],
                     word_count=c["word_count"],
                     character_count=c["character_count"],
-                    embedding_json=json.dumps(emb_vec),
-                    embedding_model=model_name,
+                    embedding_json=emb_json,
+                    embedding_model=effective_model,
                     metadata_json=json.dumps(chunk_meta)
                 )
                 new_chunk_records.append(chunk_obj)

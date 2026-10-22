@@ -263,19 +263,29 @@ export const ChatPage: React.FC = () => {
     try {
       const statusData = await getOllamaStatus();
       setOllamaStatus(statusData);
-      if (statusData.models && statusData.models.length > 0) {
-        // Include in-browser local AI options alongside backend models
-        const combined = Array.from(new Set([...statusData.models, 'in-browser-extractive', 'smollm-135m-q4']));
+      const browserModels = [
+        'in-browser-extractive',
+        'SmolLM2-135M-Instruct-q0f16-MLC',
+        'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',
+        'Llama-3.2-1B-Instruct-q4f16_1-MLC',
+      ];
+      if (statusData.online && statusData.models && statusData.models.length > 0) {
+        // Online: prioritize hosted model (Groq / Gemini / OpenAI / Ollama), but keep browser options available
+        const combined = Array.from(new Set([...statusData.models, ...browserModels]));
         setAvailableModels(combined);
-        if (!combined.includes(selectedModel)) {
-          setSelectedModel(statusData.models[0]);
-        }
+        const preferred = statusData.active_model || statusData.models[0];
+        setSelectedModel(preferred);
       } else {
-        setAvailableModels(['in-browser-extractive', 'smollm-135m-q4', 'qwen1.5-0.5b-q4']);
+        // Offline / Unconfigured Cloud: default to zero-download in-browser extractive or local WebLLM
+        setAvailableModels(browserModels);
         setSelectedModel('in-browser-extractive');
       }
     } catch {
-      setAvailableModels(['in-browser-extractive', 'smollm-135m-q4', 'qwen1.5-0.5b-q4']);
+      setAvailableModels([
+        'in-browser-extractive',
+        'SmolLM2-135M-Instruct-q0f16-MLC',
+        'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',
+      ]);
       setSelectedModel('in-browser-extractive');
     }
   };

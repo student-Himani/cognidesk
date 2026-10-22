@@ -239,30 +239,36 @@ export const streamRagQuery = (
     .catch(async (err) => {
       if (err.name === 'AbortError') return;
 
-      // In-Browser Local AI Offline Fallback (Module 32)
-      console.warn('[RagService] Stream connection unavailable, activating in-browser AI engine:', err);
+      // In-Browser Local AI Offline (WebLLM / Extractive RAG)
+      console.warn('[RagService] Cloud stream unavailable, executing in-browser AI engine:', err);
       try {
         const localChunks = await localDb.searchLocalChunks(payload.query, 1, payload.top_k || 3);
-        const result = await browserAiEngine.generateOfflineAnswer({
-          query: payload.query,
-          chunks: localChunks,
-          modelId: payload.model,
-        });
+        const citations: RagCitation[] = localChunks.map((c) => ({
+          docName: c.docName,
+          page: `Chunk #${c.chunkIndex}`,
+          score: c.scoreText,
+          documentId: typeof c.documentId === 'number' ? c.documentId : 1,
+        }));
 
         onMetadata({
-          model: result.model,
-          citations: result.citations,
-          context_used_count: result.citations.length,
+          model: payload.model || 'In-Browser Local AI',
+          citations,
+          context_used_count: citations.length,
         });
 
-        // Progressive word streaming simulation for natural conversational pacing
-        const words = result.answer.split(' ');
-        for (let i = 0; i < words.length; i++) {
-          if (controller.signal.aborted) break;
-          onToken((i === 0 ? '' : ' ') + words[i]);
-          await new Promise((r) => setTimeout(r, 18));
-        }
-        onDone();
+        const cancelOfflineStream = await browserAiEngine.streamOfflineAnswer(
+          {
+            query: payload.query,
+            chunks: localChunks,
+            modelId: payload.model,
+            conversationHistory: payload.messages?.map((m) => ({ sender: m.sender, text: m.text })),
+          },
+          onToken,
+          onDone,
+          onError
+        );
+
+        controller.signal.addEventListener('abort', () => cancelOfflineStream());
       } catch (fallbackErr) {
         onError(err);
       }

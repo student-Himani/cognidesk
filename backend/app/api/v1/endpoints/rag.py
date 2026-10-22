@@ -1,13 +1,14 @@
 import os
 import logging
 from typing import List, Optional, Any, Dict
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.auth_deps import get_current_user_optional, verify_workspace_access
+from app.core.rate_limiter import ai_rate_limiter
 from app.models.user import User
 from app.models.document import Document
 from app.core.config import settings
@@ -33,13 +34,17 @@ class RAGQueryRequest(BaseModel):
 
 @router.post("/query", status_code=status.HTTP_200_OK)
 def query_rag_pipeline(
+    request: Request,
     payload: RAGQueryRequest,
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """
-    Module 09 / Module 24 / Module 27 / Module 28: Full RAG Pipeline non-streaming endpoint with user isolation.
+    Module 09 / Module 24 / Module 27 / Module 28: Full RAG Pipeline non-streaming endpoint with user isolation and rate limiting.
     """
+    # Enforce abuse protection & rate limit (30 queries/min per IP, burst protection)
+    ai_rate_limiter.check(request)
+
     if not payload.query.strip():
         raise HTTPException(status_code=400, detail="Query string cannot be empty.")
 
@@ -90,13 +95,17 @@ def query_rag_pipeline(
 
 @router.post("/stream", status_code=status.HTTP_200_OK)
 def stream_rag_pipeline(
+    request: Request,
     payload: RAGQueryRequest,
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """
-    Module 09 / Module 24 / Module 27 / Module 28: Streaming RAG Pipeline endpoint (Server-Sent Events) with user isolation.
+    Module 09 / Module 24 / Module 27 / Module 28: Streaming RAG Pipeline endpoint (Server-Sent Events) with user isolation and rate limiting.
     """
+    # Enforce abuse protection & rate limit (30 queries/min per IP, burst protection)
+    ai_rate_limiter.check(request)
+
     if not payload.query.strip():
         raise HTTPException(status_code=400, detail="Query string cannot be empty.")
 

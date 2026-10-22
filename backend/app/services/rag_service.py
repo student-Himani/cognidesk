@@ -74,7 +74,6 @@ class RAGPipelineService:
 
         # Fallback to exact keyword / full-text search in SQLite chunks if semantic search returned no results
         if not results:
-            logger.info("Semantic search returned no results; falling back to SQLite full-text search.")
             results = search_service.search_fulltext(
                 db=db,
                 query_text=query,
@@ -82,6 +81,8 @@ class RAGPipelineService:
                 filetype=filetype,
                 document_ids=document_ids
             )
+            for r in results:
+                r["score"] = "Lexical Full-Text Match"
 
         # If a single document is targeted and still no results, retrieve the document's top chunks directly
         if not results and document_ids and len(document_ids) == 1:
