@@ -280,12 +280,11 @@ class RAGPipelineService:
                 pass
 
         has_keys = bool(
-            getattr(settings, "GROQ_API_KEY", None) or
-            getattr(settings, "GEMINI_API_KEY", None) or
-            getattr(settings, "OPENAI_API_KEY", None) or
-            getattr(settings, "ANTHROPIC_API_KEY", None) or
-            getattr(settings, "OPENROUTER_API_KEY", None) or
-            os.environ.get("GEMINI_API_KEY") or
+            getattr(settings, "GROQ_API_KEY", None) or os.environ.get("GROQ_API_KEY") or
+            getattr(settings, "GEMINI_API_KEY", None) or os.environ.get("GEMINI_API_KEY") or
+            getattr(settings, "OPENAI_API_KEY", None) or os.environ.get("OPENAI_API_KEY") or
+            getattr(settings, "ANTHROPIC_API_KEY", None) or os.environ.get("ANTHROPIC_API_KEY") or
+            getattr(settings, "OPENROUTER_API_KEY", None) or os.environ.get("OPENROUTER_API_KEY") or
             db_has_key
         )
 

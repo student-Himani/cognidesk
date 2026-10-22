@@ -80,9 +80,9 @@ export const ChatPage: React.FC = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(() => {
     return typeof window !== 'undefined' ? window.innerWidth >= 768 : true;
   });
-  const [chatMode, setChatMode] = useState<'normal' | 'document'>('document');
-  const [selectedModel, setSelectedModel] = useState('qwen2.5:3b');
-  const [availableModels, setAvailableModels] = useState<string[]>(['qwen2.5:3b']);
+  const [chatMode, setChatMode] = useState<'normal' | 'document'>('normal');
+  const [selectedModel, setSelectedModel] = useState('llama-3.3-70b-versatile');
+  const [availableModels, setAvailableModels] = useState<string[]>(['llama-3.3-70b-versatile']);
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatusData | null>(null);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
@@ -200,13 +200,13 @@ export const ChatPage: React.FC = () => {
           id: 'thread-1',
           title: 'CogniDesk AI Chat',
           time: 'Just now',
-          mode: 'document',
+          mode: 'normal',
           selectedDocId: 'all',
           messages: [
             {
               id: 'm1',
               sender: 'assistant',
-              text: 'Welcome to CogniDesk Dual-Mode AI Chatbot!\n\n• Document Chat: Asks questions over your uploaded PDF/DOCX/TXT files using ChromaDB vector search.\n• Normal Chat: Direct offline AI conversation without document retrieval.',
+              text: 'Welcome to CogniDesk Universal AI Assistant!\n\n• Normal Chat: Direct ChatGPT-like conversational AI for general knowledge, coding, writing, and brainstorming.\n• Document Chat: Grounded answers with source citations over your uploaded PDF/DOCX/TXT files and images.',
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             },
           ],

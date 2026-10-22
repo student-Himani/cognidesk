@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.setting import AppSetting
-from app.services.providers.base import BaseLLMProvider, LLMResponse, OfflineModeEnforcedError
+from app.services.providers.base import BaseLLMProvider, LLMResponse, OfflineModeEnforcedError, CloudProviderError
 from app.services.providers.ollama_provider import OllamaProvider
 from app.services.providers.anthropic_provider import AnthropicProvider
 from app.services.providers.openai_provider import OpenAIProvider
@@ -92,9 +92,9 @@ def get_llm_provider(
     is_hosted = settings.is_hosted()
 
     # 1. Check for Server-Side Hosted AI Configuration (Never exposed to client)
-    server_provider = (settings.HOSTED_LLM_PROVIDER or "").lower().strip()
-    server_model = force_model or settings.HOSTED_LLM_MODEL
-    server_base_url = settings.HOSTED_LLM_BASE_URL
+    server_provider = (settings.HOSTED_LLM_PROVIDER or os.environ.get("HOSTED_LLM_PROVIDER") or os.environ.get("AI_PROVIDER") or "").lower().strip()
+    server_model = force_model or settings.HOSTED_LLM_MODEL or os.environ.get("HOSTED_LLM_MODEL")
+    server_base_url = settings.HOSTED_LLM_BASE_URL or os.environ.get("HOSTED_LLM_BASE_URL")
 
     # Gemini server configuration
     gemini_key = getattr(settings, "GEMINI_API_KEY", None) or os.environ.get("GEMINI_API_KEY")
@@ -106,33 +106,37 @@ def get_llm_provider(
         )
 
     # Groq server configuration
-    if settings.GROQ_API_KEY and (server_provider in ("groq", "openai", "") or not server_provider):
+    groq_key = getattr(settings, "GROQ_API_KEY", None) or os.environ.get("GROQ_API_KEY")
+    if groq_key and (server_provider in ("groq", "openai", "") or not server_provider):
         return OpenAIProvider(
-            api_key=settings.GROQ_API_KEY,
+            api_key=groq_key,
             model=server_model or "llama-3.3-70b-versatile",
             base_url=server_base_url or "https://api.groq.com/openai/v1"
         )
 
     # OpenRouter server configuration
-    if settings.OPENROUTER_API_KEY and (server_provider in ("openrouter", "openai", "") or not server_provider):
+    openrouter_key = getattr(settings, "OPENROUTER_API_KEY", None) or os.environ.get("OPENROUTER_API_KEY")
+    if openrouter_key and (server_provider in ("openrouter", "openai", "") or not server_provider):
         return OpenAIProvider(
-            api_key=settings.OPENROUTER_API_KEY,
+            api_key=openrouter_key,
             model=server_model or "meta-llama/llama-3.3-70b-instruct",
             base_url=server_base_url or "https://openrouter.ai/api/v1"
         )
 
     # OpenAI server configuration
-    if settings.OPENAI_API_KEY and (server_provider in ("openai", "") or not server_provider):
+    openai_key = getattr(settings, "OPENAI_API_KEY", None) or os.environ.get("OPENAI_API_KEY")
+    if openai_key and (server_provider in ("openai", "") or not server_provider):
         return OpenAIProvider(
-            api_key=settings.OPENAI_API_KEY,
+            api_key=openai_key,
             model=server_model or "gpt-4o-mini",
             base_url=server_base_url or "https://api.openai.com/v1"
         )
 
     # Anthropic server configuration
-    if settings.ANTHROPIC_API_KEY and (server_provider in ("anthropic", "") or not server_provider):
+    anthropic_key = getattr(settings, "ANTHROPIC_API_KEY", None) or os.environ.get("ANTHROPIC_API_KEY")
+    if anthropic_key and (server_provider in ("anthropic", "") or not server_provider):
         return AnthropicProvider(
-            api_key=settings.ANTHROPIC_API_KEY,
+            api_key=anthropic_key,
             model=server_model or "claude-3-5-sonnet-20241022",
             base_url=server_base_url or "https://api.anthropic.com"
         )

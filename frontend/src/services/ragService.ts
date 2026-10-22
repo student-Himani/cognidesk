@@ -223,6 +223,39 @@ export const streamRagQuery = (
               } else if (parsed.type === 'token') {
                 onToken(parsed.token);
               } else if (parsed.type === 'error') {
+                if (parsed.provider === 'unconfigured' || parsed.error?.includes('Setup Required')) {
+                  console.info('[RagService] Server-side hosted provider unconfigured, seamlessly engaging In-Browser AI Engine.');
+                  try {
+                    const localChunks = await localDb.searchLocalChunks(payload.query, 1, payload.top_k || 3);
+                    const citations: RagCitation[] = localChunks.map((c) => ({
+                      docName: c.docName,
+                      page: `Chunk #${c.chunkIndex}`,
+                      score: c.scoreText,
+                      documentId: typeof c.documentId === 'number' ? c.documentId : 1,
+                    }));
+
+                    onMetadata({
+                      model: 'In-Browser Local AI (Instant Mode)',
+                      citations,
+                      context_used_count: citations.length,
+                    });
+
+                    await browserAiEngine.streamOfflineAnswer(
+                      {
+                        query: payload.query,
+                        chunks: localChunks,
+                        modelId: payload.model,
+                        conversationHistory: payload.messages?.map((m) => ({ sender: m.sender, text: m.text })),
+                      },
+                      onToken,
+                      onDone,
+                      onError
+                    );
+                    return;
+                  } catch (e) {
+                    // fallback to standard error reporting if in-browser execution fails
+                  }
+                }
                 onError(new Error(parsed.error || 'AI generation error'));
                 return;
               } else if (parsed.type === 'done') {

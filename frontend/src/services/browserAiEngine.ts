@@ -528,16 +528,18 @@ class BrowserAiEngine {
       const qLower = query.toLowerCase().trim();
       let generalAnswer = '';
 
-      if (qLower.match(/\b(hi|hello|hey|greetings|who are you|help)\b/)) {
+      if (qLower.match(/\b(hi|hello|hey|greetings|who are you|help|what is cognidesk)\b/)) {
         generalAnswer =
-          "Hello! I am CogniDesk's In-Browser Offline Assistant running 100% locally on your device.\n\n" +
-          "• **Local Storage**: Your documents, notes, flashcards, and conversations are safely saved in your browser's IndexedDB.\n" +
-          "• **Offline Inference**: You can chat directly using browser-native models (SmolLM2 / Qwen 2.5 via WebGPU), or upload documents for grounded citations.\n" +
-          "• **Privacy Guaranteed**: Zero bytes leave your device in this mode.";
+          "Hello! I am CogniDesk's Universal AI Assistant.\n\n" +
+          "• **Conversational Chat**: Ask general questions, brainstorm ideas, write notes, and create flashcards.\n" +
+          "• **Document Analysis & RAG**: Upload PDF, DOCX, TXT files or images using the paperclip to ask questions grounded directly in your documents with verified citations.\n" +
+          "• **Online & Offline Dual-Engine**: Connects to fast cloud inference (Groq / Gemini / OpenAI) when available, and runs 100% offline WebLLM models directly on your GPU.\n" +
+          "• **Persistent Storage**: Your workspaces, notes, flashcards, and conversation history are safely preserved.";
       } else {
         generalAnswer =
-          `I am operating in 100% offline local mode. No matching document context was found for "${query}".\n\n` +
-          `Attach or create a document in your active workspace using the paperclip, or download a browser neural model in Settings to chat freely without documents.`;
+          `I am currently operating via CogniDesk's In-Browser Local Engine.\n\n` +
+          `• **Conversational AI**: For open-ended general chat, Hosted Online AI uses server-configured keys (e.g. Groq / Gemini), or you can download a local WebLLM neural model (SmolLM2 / Qwen2.5) in Settings.\n` +
+          `• **Document Q&A**: To ask questions grounded in your research or notes, upload a PDF, DOCX, TXT, or image file using the paperclip icon.`;
       }
 
       return {
