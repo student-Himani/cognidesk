@@ -176,29 +176,17 @@ Frontend (React)
 ↓
 
 FastAPI Backend
-
 ↓
-
 Document Processing
-
 ↓
-
 Chunking
-
 ↓
-
 Embedding Generation
-
 ↓
-
 ChromaDB
-
 ↓
-
 Retriever
-
 ↓
-
 Prompt Builder
 
 ↓

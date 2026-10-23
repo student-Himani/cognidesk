@@ -448,8 +448,20 @@ export const ChatPage: React.FC = () => {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setThreads((prev) =>
-      prev.map((t) => {
+    setThreads((prev) => {
+      if (prev.length === 0) {
+        const fallbackThread: Thread = {
+          id: activeThreadId || 'thread-1',
+          title: userText.length > 25 ? userText.substring(0, 25) + '...' : userText,
+          time: 'Just now',
+          mode: chatMode,
+          selectedDocId: selectedDocId,
+          messages: [userMessage, initialAiMessage],
+        };
+        saveChatThread(fallbackThread);
+        return [fallbackThread];
+      }
+      return prev.map((t) => {
         if (t.id !== activeThreadId) return t;
         const newTitle =
           t.messages.length === 0
@@ -463,8 +475,8 @@ export const ChatPage: React.FC = () => {
           title: newTitle,
           messages: [...t.messages, userMessage, initialAiMessage],
         };
-      })
-    );
+      });
+    });
 
     executeRagQueryStream(userText, activeThreadId, aiMsgId, chatMode);
   };
@@ -473,6 +485,24 @@ export const ChatPage: React.FC = () => {
     if (isStreaming) return;
     handleSend(suggestionText);
   };
+
+  // Auto-send prompt if navigated from Dashboard with ?prompt=...
+  useEffect(() => {
+    const urlPrompt = searchParams.get('prompt');
+    if (urlPrompt && urlPrompt.trim() && !isStreaming) {
+      const cleanPrompt = decodeURIComponent(urlPrompt).trim();
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('prompt');
+          next.delete('fileName');
+          return next;
+        },
+        { replace: true }
+      );
+      handleSend(cleanPrompt);
+    }
+  }, [searchParams, isStreaming]);
 
   const executeRagQueryStream = (queryText: string, threadId: string, aiMsgId: string, currentMode: 'normal' | 'document') => {
     setIsStreaming(true);
