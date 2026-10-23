@@ -236,10 +236,9 @@ class SettingsService:
             p = AnthropicProvider(api_key=real_key, model=target_model, base_url=target_url)
             return p.test_connection()
         elif prov_name == "gemini":
-            from app.services.providers.openai_provider import OpenAIProvider
-            target_model = model or record.cloud_model or "gemini-1.5-flash"
-            target_url = base_url or ("https://generativelanguage.googleapis.com/v1beta/openai/" if not record.cloud_base_url or "api.openai.com" in record.cloud_base_url else record.cloud_base_url)
-            p = OpenAIProvider(api_key=real_key, model=target_model, base_url=target_url)
+            from app.services.providers.gemini_provider import GeminiProvider
+            target_model = model or record.cloud_model or "gemini-2.5-flash"
+            p = GeminiProvider(api_key=real_key, model=target_model, base_url=base_url)
             return p.test_connection()
         elif prov_name == "groq":
             from app.services.providers.openai_provider import OpenAIProvider

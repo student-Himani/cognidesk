@@ -318,7 +318,7 @@ class RAGPipelineService:
             model_name = (
                 db_model if db_has_key else (
                     getattr(settings, "HOSTED_LLM_MODEL", None) or (
-                        "gemini-1.5-flash" if provider_name == "gemini" else (
+                        "gemini-2.5-flash" if provider_name == "gemini" else (
                             "llama-3.3-70b-versatile" if provider_name == "groq" else (
                                 "gpt-4o-mini" if provider_name == "openai" else (
                                     "claude-3-5-sonnet-20241022" if provider_name == "anthropic" else "hosted-model"
@@ -333,7 +333,7 @@ class RAGPipelineService:
                 "is_hosted": True,
                 "unconfigured": False,
                 "provider": provider_name,
-                "base_url": getattr(settings, "HOSTED_LLM_BASE_URL", None) or f"https://api.{provider_name}.com",
+                "base_url": getattr(settings, "HOSTED_LLM_BASE_URL", None) or ("https://generativelanguage.googleapis.com" if provider_name == "gemini" else f"https://api.{provider_name}.com"),
                 "models": [model_name, "default"],
                 "mode_label": f"Cloud AI ({provider_name.title()})"
             }

@@ -74,6 +74,7 @@ def read_root():
         "message": "Welcome to CogniDesk API",
         "version": settings.VERSION,
         "status": "online",
+        "release": "2026.10-gemini-native",
         "docs_url": "/docs"
     }
 

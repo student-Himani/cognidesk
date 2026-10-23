@@ -9,6 +9,7 @@ from app.services.providers.base import BaseLLMProvider, LLMResponse, OfflineMod
 from app.services.providers.ollama_provider import OllamaProvider
 from app.services.providers.anthropic_provider import AnthropicProvider
 from app.services.providers.openai_provider import OpenAIProvider
+from app.services.providers.gemini_provider import GeminiProvider
 
 logger = logging.getLogger("app")
 
@@ -99,10 +100,10 @@ def get_llm_provider(
     # Gemini server configuration
     gemini_key = getattr(settings, "GEMINI_API_KEY", None) or os.environ.get("GEMINI_API_KEY")
     if gemini_key and (server_provider in ("gemini", "google", "") or not server_provider):
-        return OpenAIProvider(
+        return GeminiProvider(
             api_key=gemini_key,
-            model=server_model or "gemini-1.5-flash",
-            base_url=server_base_url or "https://generativelanguage.googleapis.com/v1beta/openai/"
+            model=server_model or "gemini-2.5-flash",
+            base_url=server_base_url
         )
 
     # Groq server configuration
@@ -177,11 +178,10 @@ def get_llm_provider(
                 base_url=base_url
             )
         elif cloud_provider_name == "gemini" or ai_provider == "gemini":
-            base_url = cloud_base_url if cloud_base_url and "googleapis.com" in cloud_base_url else "https://generativelanguage.googleapis.com/v1beta/openai/"
-            return OpenAIProvider(
-                api_key=cloud_api_key,
-                model=cloud_model or "gemini-1.5-flash",
-                base_url=base_url
+            return GeminiProvider(
+                api_key=cloud_api_key or gemini_key,
+                model=cloud_model or "gemini-2.5-flash",
+                base_url=cloud_base_url
             )
         elif cloud_provider_name == "groq" or ai_provider == "groq":
             base_url = cloud_base_url if cloud_base_url and "groq.com" in cloud_base_url else "https://api.groq.com/openai/v1"

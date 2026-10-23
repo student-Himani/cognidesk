@@ -7,6 +7,7 @@ from app.services.providers.base import (
 from app.services.providers.ollama_provider import OllamaProvider
 from app.services.providers.anthropic_provider import AnthropicProvider
 from app.services.providers.openai_provider import OpenAIProvider
+from app.services.providers.gemini_provider import GeminiProvider
 from app.services.providers.factory import get_llm_provider
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "OllamaProvider",
     "AnthropicProvider",
     "OpenAIProvider",
+    "GeminiProvider",
     "get_llm_provider",
 ]
