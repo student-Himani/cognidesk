@@ -81,18 +81,37 @@ def read_root():
                 res = client.get("https://generativelanguage.googleapis.com/v1beta/models", headers={"x-goog-api-key": gemini_key})
                 if res.status_code == 200:
                     data = res.json()
-                    available_gemini_models = [m.get("name", "").replace("models/", "") for m in data.get("models", [])]
+                    available_gemini_models = [
+                        {"id": m.get("name", "").replace("models/", ""), "methods": m.get("supportedGenerationMethods", [])}
+                        for m in data.get("models", [])
+                        if "generateContent" in m.get("supportedGenerationMethods", [])
+                    ]
                 else:
                     gemini_probe_error = f"HTTP {res.status_code}: {res.text[:200]}"
         except Exception as e:
             gemini_probe_error = str(e)
 
+    test_gen_result = None
+    if gemini_key and available_gemini_models:
+        test_model = available_gemini_models[0]["id"]
+        try:
+            with httpx.Client(timeout=8.0) as client:
+                test_res = client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{test_model}:generateContent",
+                    headers={"x-goog-api-key": gemini_key, "Content-Type": "application/json"},
+                    json={"contents": [{"role": "user", "parts": [{"text": "Say hello in 3 words"}]}]}
+                )
+                test_gen_result = f"HTTP {test_res.status_code}: {test_res.text[:300]}"
+        except Exception as e:
+            test_gen_result = str(e)
+
     return {
         "message": "Welcome to CogniDesk API",
         "version": settings.VERSION,
         "status": "online",
-        "release": "2026.10-gemini-probe",
+        "release": "2026.10-gemini-probe-v2",
         "docs_url": "/docs",
+        "test_gen_result": test_gen_result,
         "gemini_models": available_gemini_models,
         "gemini_probe_error": gemini_probe_error,
         "has_gemini_key": bool(gemini_key),
