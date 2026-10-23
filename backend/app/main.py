@@ -70,12 +70,34 @@ app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():
+    import os
+    gemini_key = getattr(settings, "GEMINI_API_KEY", None) or os.environ.get("GEMINI_API_KEY")
+    available_gemini_models = []
+    gemini_probe_error = None
+    if gemini_key:
+        try:
+            import httpx
+            with httpx.Client(timeout=5.0) as client:
+                res = client.get("https://generativelanguage.googleapis.com/v1beta/models", headers={"x-goog-api-key": gemini_key})
+                if res.status_code == 200:
+                    data = res.json()
+                    available_gemini_models = [m.get("name", "").replace("models/", "") for m in data.get("models", [])]
+                else:
+                    gemini_probe_error = f"HTTP {res.status_code}: {res.text[:200]}"
+        except Exception as e:
+            gemini_probe_error = str(e)
+
     return {
         "message": "Welcome to CogniDesk API",
         "version": settings.VERSION,
         "status": "online",
-        "release": "2026.10-gemini-native",
-        "docs_url": "/docs"
+        "release": "2026.10-gemini-probe",
+        "docs_url": "/docs",
+        "gemini_models": available_gemini_models,
+        "gemini_probe_error": gemini_probe_error,
+        "has_gemini_key": bool(gemini_key),
+        "has_groq_key": bool(getattr(settings, "GROQ_API_KEY", None) or os.environ.get("GROQ_API_KEY")),
+        "has_openai_key": bool(getattr(settings, "OPENAI_API_KEY", None) or os.environ.get("OPENAI_API_KEY")),
     }
 
 @app.get("/health")
