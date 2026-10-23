@@ -168,13 +168,9 @@ Features
 # 🏗 Project Architecture
 
 User
-
 ↓
-
 Frontend (React)
-
 ↓
-
 FastAPI Backend
 ↓
 Document Processing
@@ -188,23 +184,14 @@ ChromaDB
 Retriever
 ↓
 Prompt Builder
-
 ↓
-
 Ollama
-
 ↓
-
 Streaming Response
-
 ↓
-
 Frontend
-
 ↓
-
 SQLite
-
 ---
 
 # 🔄 Complete Workflow

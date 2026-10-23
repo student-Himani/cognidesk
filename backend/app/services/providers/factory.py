@@ -102,7 +102,7 @@ def get_llm_provider(
     if gemini_key and (server_provider in ("gemini", "google", "") or not server_provider):
         return GeminiProvider(
             api_key=gemini_key,
-            model=server_model or "gemini-2.5-flash",
+            model=server_model or "gemini-3.8-flash",
             base_url=server_base_url
         )
 
@@ -180,7 +180,7 @@ def get_llm_provider(
         elif cloud_provider_name == "gemini" or ai_provider == "gemini":
             return GeminiProvider(
                 api_key=cloud_api_key or gemini_key,
-                model=cloud_model or "gemini-2.5-flash",
+                model=cloud_model or "gemini-3.8-flash",
                 base_url=cloud_base_url
             )
         elif cloud_provider_name == "groq" or ai_provider == "groq":

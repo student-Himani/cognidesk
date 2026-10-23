@@ -237,7 +237,7 @@ class SettingsService:
             return p.test_connection()
         elif prov_name == "gemini":
             from app.services.providers.gemini_provider import GeminiProvider
-            target_model = model or record.cloud_model or "gemini-2.5-flash"
+            target_model = model or record.cloud_model or "gemini-3.8-flash"
             p = GeminiProvider(api_key=real_key, model=target_model, base_url=base_url)
             return p.test_connection()
         elif prov_name == "groq":

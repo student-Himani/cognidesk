@@ -226,8 +226,8 @@ def init_db_settings():
                         current.is_offline_mode = False
                     if current.ai_provider == "ollama":
                         current.ai_provider = "cloud"
-                    if current.cloud_provider == "gemini" and current.cloud_model in ("gemini-1.5-flash", None):
-                        current.cloud_model = "gemini-2.5-flash"
+                    if current.cloud_provider == "gemini" and current.cloud_model in ("gemini-1.5-flash", "gemini-2.5-flash", None):
+                        current.cloud_model = "gemini-3.8-flash"
                     db.commit()
             else:
                 logger.info("Initializing Default Settings in SQLite database (ID: 1).")
@@ -236,7 +236,7 @@ def init_db_settings():
                 default_cloud_model = "gpt-4o-mini"
                 if getattr(settings, "GEMINI_API_KEY", None):
                     default_cloud_provider = "gemini"
-                    default_cloud_model = "gemini-2.5-flash"
+                    default_cloud_model = "gemini-3.8-flash"
                 elif getattr(settings, "GROQ_API_KEY", None):
                     default_cloud_provider = "groq"
                     default_cloud_model = "llama-3.3-70b-versatile"

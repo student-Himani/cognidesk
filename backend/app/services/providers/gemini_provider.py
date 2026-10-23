@@ -16,14 +16,14 @@ class GeminiProvider(BaseLLMProvider):
     Never logs or leaks API keys.
     """
 
-    DEFAULT_MODEL = "gemini-2.5-flash"
+    DEFAULT_MODEL = "gemini-3.8-flash"
     FALLBACK_MODELS = [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-pro",
-        "gemini-pro",
+        "gemini-3.8-flash",
+        "gemini-flash-latest",
+        "gemini-3.5-flash",
+        "gemini-3.7-flash",
+        "gemini-3.1-flash-lite",
+        "gemini-flash-lite-latest",
     ]
 
     def __init__(
@@ -93,7 +93,10 @@ class GeminiProvider(BaseLLMProvider):
     def _get_candidate_models(self, preferred_model: Optional[str] = None) -> List[str]:
         chosen = preferred_model or self.model
         # Strip prefixes like 'models/' if passed
-        clean_chosen = chosen.replace("models/", "")
+        clean_chosen = chosen.replace("models/", "").strip()
+        # Automatically upgrade deprecated legacy models
+        if clean_chosen in ("gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-pro", "default", ""):
+            clean_chosen = "gemini-3.8-flash"
         candidates = [clean_chosen]
         for fb in self.FALLBACK_MODELS:
             if fb not in candidates:
