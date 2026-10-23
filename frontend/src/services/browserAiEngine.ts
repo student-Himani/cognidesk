@@ -13,11 +13,13 @@ import {
   hasModelInCache,
   deleteModelAllInfoInCache,
 } from '@mlc-ai/web-llm';
+import WebLLMWorker from '../workers/webllm.worker?worker';
 import { RagCitation } from './ragService';
 
 export interface BrowserAiCapabilities {
   webGpuSupported: boolean;
   webGpuAdapterName?: string;
+  shaderF16Supported?: boolean;
   wasmSupported: boolean;
   simdSupported: boolean;
   workerSupported: boolean;
@@ -113,12 +115,16 @@ class BrowserAiEngine {
 
     let webGpuSupported = false;
     let adapterName: string | undefined;
+    let shaderF16Supported = false;
 
     if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
       try {
         const adapter = await (navigator as any).gpu.requestAdapter();
         if (adapter) {
           webGpuSupported = true;
+          if (adapter.features && adapter.features.has('shader-f16')) {
+            shaderF16Supported = true;
+          }
           const info = await adapter.requestAdapterInfo?.().catch(() => null);
           adapterName = info?.description || info?.vendor || 'WebGPU Compatible Hardware';
         }
@@ -152,6 +158,7 @@ class BrowserAiEngine {
     this.capabilities = {
       webGpuSupported,
       webGpuAdapterName: adapterName,
+      shaderF16Supported,
       wasmSupported,
       simdSupported,
       workerSupported: typeof Worker !== 'undefined',
@@ -162,13 +169,33 @@ class BrowserAiEngine {
     return this.capabilities;
   }
 
+  resolveCompatibleModelId(modelId: string, caps?: BrowserAiCapabilities | null): string {
+    const hasShaderF16 = caps ? caps.shaderF16Supported : this.capabilities?.shaderF16Supported;
+    if (!hasShaderF16) {
+      if (modelId === 'SmolLM2-135M-Instruct-q0f16-MLC') {
+        return 'SmolLM2-135M-Instruct-q0f32-MLC';
+      }
+      if (modelId === 'SmolLM2-360M-Instruct-q4f16_1-MLC') {
+        return 'SmolLM2-360M-Instruct-q4f32_1-MLC';
+      }
+    }
+    return modelId;
+  }
+
   // ----------------------------------------------------------------------------
   // 2. Persistent Cache Verification (WebLLM CacheStorage)
   // ----------------------------------------------------------------------------
   async isModelCached(modelId: string): Promise<boolean> {
     if (modelId === 'in-browser-extractive') return true;
     try {
-      return await hasModelInCache(modelId);
+      const caps = await this.detectCapabilities();
+      const actualId = this.resolveCompatibleModelId(modelId, caps);
+      const cached = await hasModelInCache(actualId);
+      if (cached) return true;
+      if (actualId !== modelId) {
+        return await hasModelInCache(modelId);
+      }
+      return false;
     } catch {
       return false;
     }
@@ -253,6 +280,8 @@ class BrowserAiEngine {
       });
     };
 
+    const actualModelId = this.resolveCompatibleModelId(modelId, caps);
+
     try {
       // 1. Terminate any previous worker
       if (this.activeWorker) {
@@ -263,19 +292,43 @@ class BrowserAiEngine {
       }
       this.engine = null;
 
-      // 2. Spawn fresh Web Worker for off-main-thread inference
-      const workerUrl = new URL('../workers/webllm.worker.ts', import.meta.url);
-      const worker = new Worker(workerUrl, { type: 'module' });
-      this.activeWorker = worker;
+      // 2. Initialize engine: try Web Worker first for non-blocking UI,
+      // with a 6-second handshake timeout that falls back to direct main-thread CreateMLCEngine
+      // if worker fails or browser restricts WorkerNavigator.gpu (common on mobile).
+      let firstProgressReceived = false;
+      const wrappedProgress = (report: InitProgressReport) => {
+        firstProgressReceived = true;
+        progressCallback(report);
+      };
 
       try {
-        this.engine = await CreateWebWorkerMLCEngine(worker, modelId, {
-          initProgressCallback: progressCallback,
+        const worker = new WebLLMWorker();
+        this.activeWorker = worker;
+
+        const workerEnginePromise = CreateWebWorkerMLCEngine(worker, actualModelId, {
+          initProgressCallback: wrappedProgress,
         });
+
+        // 6-second timeout for worker to respond with initial handshake
+        const handshakeTimeout = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            if (!firstProgressReceived) {
+              reject(new Error('Web Worker did not respond within 6s (worker WebGPU unavailable)'));
+            }
+          }, 6000);
+        });
+
+        this.engine = await Promise.race([workerEnginePromise, handshakeTimeout]);
       } catch (workerErr: any) {
-        console.warn('[BrowserAI] WebWorkerMLCEngine initialization note, falling back to direct MLCEngine:', workerErr);
-        // Fallback to direct in-thread WebGPU engine if worker environment restricts module imports
-        this.engine = await CreateMLCEngine(modelId, {
+        console.warn('[BrowserAI] Worker initialization note, proceeding with direct WebGPU MLCEngine:', workerErr);
+        if (this.activeWorker) {
+          try {
+            this.activeWorker.terminate();
+          } catch {}
+          this.activeWorker = null;
+        }
+        // Direct in-thread WebGPU engine
+        this.engine = await CreateMLCEngine(actualModelId, {
           initProgressCallback: progressCallback,
         });
       }
@@ -341,15 +394,24 @@ class BrowserAiEngine {
   async deleteModel(modelId: string): Promise<boolean> {
     if (modelId === 'in-browser-extractive') return true;
     try {
-      if (this.currentLoadedModelId === modelId) {
+      const caps = await this.detectCapabilities();
+      const actualId = this.resolveCompatibleModelId(modelId, caps);
+      if (this.currentLoadedModelId === modelId || this.currentLoadedModelId === actualId) {
         if (this.activeWorker) {
-          this.activeWorker.terminate();
+          try {
+            this.activeWorker.terminate();
+          } catch {}
           this.activeWorker = null;
         }
         this.engine = null;
         this.currentLoadedModelId = null;
       }
-      await deleteModelAllInfoInCache(modelId);
+      await deleteModelAllInfoInCache(actualId);
+      if (actualId !== modelId) {
+        try {
+          await deleteModelAllInfoInCache(modelId);
+        } catch {}
+      }
       return true;
     } catch {
       return false;
@@ -461,24 +523,8 @@ class BrowserAiEngine {
         }
       } catch (err: any) {
         if (!isAborted) {
-          console.warn('[BrowserAI] WebLLM streaming inference failed, falling back to extractive RAG:', err);
-          // Fall back gracefully to extractive answer so user is never blocked
-          try {
-            const fallbackRes = await this.generateOfflineAnswer({
-              query,
-              chunks,
-              modelId: 'in-browser-extractive',
-            });
-            const words = fallbackRes.answer.split(' ');
-            for (let i = 0; i < words.length; i++) {
-              if (isAborted) break;
-              onToken((i === 0 ? '' : ' ') + words[i]);
-              await new Promise((r) => setTimeout(r, 16));
-            }
-            onDone();
-          } catch (fbErr) {
-            onError(err);
-          }
+          console.error('[BrowserAI] WebLLM streaming inference failed:', err);
+          onError(err);
         }
       }
     })();

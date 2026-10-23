@@ -159,6 +159,18 @@ export const SettingsPage: React.FC = () => {
 
   const handleDownloadModel = async (modelId: string) => {
     try {
+      setDownloadProgresses((prev) => ({
+        ...prev,
+        [modelId]: {
+          modelId,
+          percent: 1,
+          loadedMb: 0,
+          totalMb: AVAILABLE_BROWSER_MODELS.find((m) => m.id === modelId)?.sizeMb || 0,
+          speedMbps: 0,
+          status: 'downloading',
+          stageText: 'Initializing WebGPU engine & requesting weights...',
+        },
+      }));
       await browserAiEngine.downloadModel(modelId, (p) => {
         setDownloadProgresses((prev) => ({ ...prev, [modelId]: p }));
       });
@@ -171,6 +183,18 @@ export const SettingsPage: React.FC = () => {
         })
       );
     } catch (err: any) {
+      setDownloadProgresses((prev) => ({
+        ...prev,
+        [modelId]: {
+          modelId,
+          percent: 0,
+          loadedMb: 0,
+          totalMb: 0,
+          speedMbps: 0,
+          status: 'error',
+          errorMessage: err.message || 'Failed to download model.',
+        },
+      }));
       dispatch(
         addToast({
           type: 'error',
@@ -1081,13 +1105,19 @@ export const SettingsPage: React.FC = () => {
                     const isCached = !!cachedModels[model.id];
                     const progress = downloadProgresses[model.id];
                     const isDownloading = progress?.status === 'downloading';
+                    const isError = progress?.status === 'error';
+                    const isAnyDownloading = Object.values(downloadProgresses).some((p) => p.status === 'downloading');
 
                     return (
                       <div
                         key={model.id}
-                        className="p-4 rounded-xl bg-slate-50/80 dark:bg-[#131c2e]/70 border border-slate-200/80 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                        className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${
+                          isError
+                            ? 'bg-rose-50/70 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40'
+                            : 'bg-slate-50/80 dark:bg-[#131c2e]/70 border-slate-200/80 dark:border-slate-800'
+                        }`}
                       >
-                        <div className="space-y-1 max-w-xl">
+                        <div className="space-y-1 max-w-xl flex-1">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-sm text-slate-900 dark:text-slate-100">{model.name}</span>
                             <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
@@ -1106,19 +1136,28 @@ export const SettingsPage: React.FC = () => {
                             </span>
                           </div>
 
+                          {/* Error message with retry explanation */}
+                          {isError && progress?.errorMessage && (
+                            <div className="pt-2">
+                              <p className="text-xs text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1.5">
+                                <span>⚠️ {progress.errorMessage}</span>
+                              </p>
+                            </div>
+                          )}
+
                           {/* Download progress bar */}
                           {isDownloading && progress && (
                             <div className="pt-2 space-y-1">
                               <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-300">
-                                <span>Downloading: {progress.percent}%</span>
+                                <span>{progress.stageText || `Downloading: ${progress.percent}%`}</span>
                                 <span>
-                                  {progress.loadedMb} / {progress.totalMb} MB ({progress.speedMbps} Mbps)
+                                  {progress.loadedMb} / {progress.totalMb} MB {progress.speedMbps > 0 ? `(${progress.speedMbps} Mbps)` : ''}
                                 </span>
                               </div>
                               <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
                                 <div
                                   className="bg-gradient-to-r from-blue-600 to-cyan-500 h-full rounded-full transition-all duration-200"
-                                  style={{ width: `${progress.percent}%` }}
+                                  style={{ width: `${Math.max(progress.percent, 3)}%` }}
                                 />
                               </div>
                             </div>
@@ -1146,11 +1185,21 @@ export const SettingsPage: React.FC = () => {
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
+                          ) : isError ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadModel(model.id)}
+                              disabled={isAnyDownloading}
+                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-semibold text-xs shadow-md shadow-rose-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                            >
+                              <Download className="w-4 h-4" />
+                              <span>Retry Download</span>
+                            </button>
                           ) : (
                             <button
                               type="button"
                               onClick={() => handleDownloadModel(model.id)}
-                              disabled={isDownloading}
+                              disabled={isDownloading || isAnyDownloading}
                               className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold text-xs shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
                             >
                               <Download className={`w-4 h-4 ${isDownloading ? 'animate-bounce' : ''}`} />
