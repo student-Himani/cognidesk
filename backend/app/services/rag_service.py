@@ -366,7 +366,7 @@ class RAGPipelineService:
         start_time = time.time()
         target_model = model or getattr(settings, "DEFAULT_MODEL", "qwen2.5:3b")
 
-        if mode == "normal":
+        if mode in ("normal", "general"):
             selected_chunks = []
             citations = []
             sys_prompt = (
@@ -479,7 +479,7 @@ class RAGPipelineService:
         """
         target_model = model or getattr(settings, "DEFAULT_MODEL", "qwen2.5:3b")
 
-        if mode == "normal":
+        if mode in ("normal", "general"):
             selected_chunks = []
             citations = []
             sys_prompt = (

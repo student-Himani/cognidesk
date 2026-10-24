@@ -18,12 +18,14 @@ class GeminiProvider(BaseLLMProvider):
 
     DEFAULT_MODEL = "gemini-3.8-flash"
     FALLBACK_MODELS = [
-        "gemini-3.8-flash",
         "gemini-flash-latest",
+        "gemini-3.8-flash",
         "gemini-3.5-flash",
         "gemini-3.7-flash",
         "gemini-3.1-flash-lite",
         "gemini-flash-lite-latest",
+        "gemini-2.5-pro",
+        "gemini-pro-latest",
     ]
 
     def __init__(
@@ -141,13 +143,19 @@ class GeminiProvider(BaseLLMProvider):
                             finish_reason=finish_reason,
                             raw_response=data
                         )
-                    elif res.status_code == 404:
-                        # Model not found on this endpoint, try next candidate model
-                        err_text = self._sanitize_error(res.text.strip())
-                        logger.warning(f"[GeminiProvider] Model '{target_model}' returned 404 ({err_text}), trying next model...")
+                    elif res.status_code in (404, 429, 503):
+                        # Model not found or temporarily overloaded/rate limited, try next candidate model
+                        err_msg = res.text.strip()
+                        try:
+                            err_json = res.json()
+                            err_msg = err_json.get("error", {}).get("message", err_msg)
+                        except Exception:
+                            pass
+                        clean_msg = self._sanitize_error(err_msg)
+                        logger.warning(f"[GeminiProvider] Model '{target_model}' returned {res.status_code} ({clean_msg}), trying next fallback model...")
                         last_error = CloudProviderError(
-                            f"Gemini API Error (HTTP 404): {err_text}",
-                            status_code=404,
+                            f"Gemini API Error (HTTP {res.status_code}): {clean_msg}",
+                            status_code=res.status_code,
                             provider=self.provider_name
                         )
                         continue
@@ -165,11 +173,13 @@ class GeminiProvider(BaseLLMProvider):
                             provider=self.provider_name
                         )
                 except (httpx.ConnectError, httpx.TimeoutException) as net_err:
-                    raise CloudProviderError(
+                    logger.warning(f"[GeminiProvider] Network error with model '{target_model}': {net_err}, trying next fallback...")
+                    last_error = CloudProviderError(
                         f"Gemini Network Error: {self._sanitize_error(str(net_err))}",
                         status_code=503,
                         provider=self.provider_name
                     )
+                    continue
 
         if last_error:
             raise last_error
@@ -212,9 +222,15 @@ class GeminiProvider(BaseLLMProvider):
                                     except json.JSONDecodeError:
                                         pass
                             return  # Stream completed successfully
-                        elif response.status_code == 404:
+                        elif response.status_code in (404, 429, 503):
                             err_text = response.read().decode("utf-8", errors="replace")
-                            logger.warning(f"[GeminiProvider] Stream model '{target_model}' 404, trying next candidate: {err_text}")
+                            try:
+                                err_json = json.loads(err_text)
+                                err_text = err_json.get("error", {}).get("message", err_text)
+                            except Exception:
+                                pass
+                            clean_err = self._sanitize_error(err_text)
+                            logger.warning(f"[GeminiProvider] Stream model '{target_model}' returned {response.status_code} ({clean_err}), trying next candidate...")
                             continue
                         else:
                             err_text = response.read().decode("utf-8", errors="replace")
@@ -230,11 +246,8 @@ class GeminiProvider(BaseLLMProvider):
                                 provider=self.provider_name
                             )
             except (httpx.ConnectError, httpx.TimeoutException) as net_err:
-                raise CloudProviderError(
-                    f"Gemini Stream Network Error: {self._sanitize_error(str(net_err))}",
-                    status_code=503,
-                    provider=self.provider_name
-                )
+                logger.warning(f"[GeminiProvider] Stream network error with model '{target_model}': {net_err}, trying next fallback...")
+                continue
 
         raise CloudProviderError("Gemini streaming failed across all candidate models.", status_code=500, provider=self.provider_name)
 
