@@ -220,16 +220,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
           </div>
 
           {/* Middle: Sleek High-Contrast Translucent Cool Grey Glass Search Bar */}
-          <div className="flex-1 max-w-xl mx-auto hidden sm:block">
+          <div className="flex-1 max-w-xs md:max-w-sm lg:max-w-md mx-2 sm:mx-3 hidden sm:block">
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl bg-white/55 hover:bg-white/80 dark:bg-slate-900/50 dark:hover:bg-slate-900/75 border border-blue-200/60 dark:border-cyan-500/25 hover:border-blue-400/80 dark:hover:border-cyan-400/50 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition-all text-xs md:text-sm group/search cursor-pointer shadow-inner backdrop-blur-md"
+              className="w-full h-9 flex items-center justify-between px-3 py-1.5 rounded-xl bg-white/55 hover:bg-white/80 dark:bg-slate-900/50 dark:hover:bg-slate-900/75 border border-blue-200/60 dark:border-cyan-500/25 hover:border-blue-400/80 dark:hover:border-cyan-400/50 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white transition-all text-xs group/search cursor-pointer shadow-inner backdrop-blur-md"
             >
-              <div className="flex items-center space-x-2">
-                <Search className="w-4 h-4 text-blue-600 dark:text-cyan-400 group-hover/search:scale-110 transition-transform" />
-                <span className="font-normal text-slate-600 dark:text-slate-300">Search anything in workspace...</span>
+              <div className="flex items-center space-x-2 truncate">
+                <Search className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400 group-hover/search:scale-110 transition-transform shrink-0" />
+                <span className="font-normal text-slate-600 dark:text-slate-300 truncate">Search workspace...</span>
               </div>
-              <kbd className="px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md shadow-xs">
+              <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md shadow-xs shrink-0 ml-1">
                 Ctrl /
               </kbd>
             </button>

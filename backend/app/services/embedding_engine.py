@@ -219,17 +219,52 @@ class EmbeddingEngine:
         # 2. Compute embeddings for cache misses in batches
         if uncached_texts:
             embeddings_array = None
-            try:
-                model = self.get_model()
-                logger.info(f"Computing embeddings for {len(uncached_texts)} chunk(s) (Batch Size: {b_size})...")
-                embeddings_array = model.encode(
-                    uncached_texts,
-                    batch_size=b_size,
-                    show_progress_bar=False,
-                    convert_to_numpy=True
-                )
-            except Exception as e:
-                logger.warning(f"SentenceTransformer encoding unavailable or failed ({e}); falling back cleanly to full-text lexical search.")
+            gemini_key = getattr(settings, "GEMINI_API_KEY", None) or os.environ.get("GEMINI_API_KEY")
+            
+            # Priority 1: Gemini Cloud Embedding API (zero RAM usage, ultra fast, no OOM)
+            if gemini_key:
+                try:
+                    import httpx
+                    logger.info(f"Generating Gemini Cloud Embeddings for {len(uncached_texts)} chunk(s)...")
+                    gemini_embeddings = []
+                    for chunk_start in range(0, len(uncached_texts), 20):
+                        batch_slice = uncached_texts[chunk_start : chunk_start + 20]
+                        reqs = [{"model": "models/text-embedding-004", "content": {"parts": [{"text": t[:2048]}]}} for t in batch_slice]
+                        with httpx.Client(timeout=25.0) as client:
+                            resp = client.post(
+                                "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:batchEmbedContents",
+                                headers={"x-goog-api-key": gemini_key, "Content-Type": "application/json"},
+                                json={"requests": reqs}
+                            )
+                            if resp.status_code == 200:
+                                b_data = resp.json().get("embeddings", [])
+                                for item in b_data:
+                                    vals = item.get("values", [])
+                                    gemini_embeddings.append(vals if vals else None)
+                            else:
+                                logger.warning(f"Gemini embedding API returned HTTP {resp.status_code}: {resp.text[:180]}")
+                                break
+                    if len(gemini_embeddings) == len(uncached_texts):
+                        embeddings_array = gemini_embeddings
+                except Exception as g_err:
+                    logger.warning(f"Gemini cloud embedding notice: {g_err}")
+
+            # Priority 2: SentenceTransformer (local desktop/dev mode only, avoid in hosted container to prevent 512MB OOM)
+            if embeddings_array is None and not settings.is_hosted() and not os.environ.get("RENDER"):
+                try:
+                    model = self.get_model()
+                    logger.info(f"Computing local SentenceTransformer embeddings for {len(uncached_texts)} chunk(s)...")
+                    embeddings_array = model.encode(
+                        uncached_texts,
+                        batch_size=b_size,
+                        show_progress_bar=False,
+                        convert_to_numpy=True
+                    )
+                except Exception as e:
+                    logger.warning(f"SentenceTransformer encoding unavailable or failed ({e}); falling back cleanly to full-text lexical search.")
+                    embeddings_array = [None] * len(uncached_texts)
+            elif embeddings_array is None:
+                # Hosted mode without Gemini embedding: fallback cleanly to SQLite lexical / FTS chunks
                 embeddings_array = [None] * len(uncached_texts)
 
             for idx_in_uncached, orig_idx in enumerate(uncached_indices):

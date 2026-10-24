@@ -30,7 +30,7 @@ class SearchService:
             raise ValueError("Search query string cannot be empty.")
         
         embeddings = embedding_engine.generate_embeddings_batch([query_text.strip()])
-        if not embeddings:
+        if not embeddings or embeddings[0] is None:
             raise RuntimeError("Failed to generate embedding for search query.")
         return embeddings[0]
 

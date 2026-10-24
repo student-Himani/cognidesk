@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 import httpx
 
 from app.core.config import settings
+from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
 from app.services.search_service import search_service
 from app.services.providers import get_llm_provider, OfflineModeEnforcedError, CloudProviderError
 

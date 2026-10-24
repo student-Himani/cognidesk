@@ -26,6 +26,8 @@ import {
   SlidersHorizontal,
   Copy,
   Download,
+  Square,
+  UploadCloud,
 } from 'lucide-react';
 import KnowledgeOrb3D from '../components/3d/KnowledgeOrb3D';
 import AIThinkingIndicator from '../components/loading/AIThinkingIndicator';
@@ -101,6 +103,7 @@ export const ChatPage: React.FC = () => {
   const [selectedCitation, setSelectedCitation] = useState<RagCitation | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -108,6 +111,7 @@ export const ChatPage: React.FC = () => {
   const optionsRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isWaitingFirstToken, setIsWaitingFirstToken] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
 
   // Conversation Threads
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -173,15 +177,28 @@ export const ChatPage: React.FC = () => {
     }
   }, [searchParams, threads]);
 
-  // Close options dropdown on outside click
+  // Close options and model dropdown on outside click or Escape key
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (optionsRef.current && !optionsRef.current.contains(e.target as Node)) {
         setIsOptionsOpen(false);
       }
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
+        setIsModelDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOptionsOpen(false);
+        setIsModelDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const loadChatHistory = async () => {
@@ -303,26 +320,65 @@ export const ChatPage: React.FC = () => {
     }
   };
 
-  // Upload document directly from paperclip button
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
+  // Upload document directly from paperclip button or drag & drop with validation
+  const uploadFileWithValidation = async (file: File) => {
+    const allowedExtensions = ['pdf', 'docx', 'pptx', 'xlsx', 'txt', 'csv', 'md', 'png', 'jpg', 'jpeg', 'bmp'];
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!ext || !allowedExtensions.includes(ext)) {
+      showError(`Format .${ext || 'unknown'} is not supported. Supported formats: ${allowedExtensions.join(', ')}`);
+      return;
+    }
+
+    const maxSize = 25 * 1024 * 1024; // 25 MB
+    if (file.size > maxSize) {
+      showError(`File "${file.name}" is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum allowed size is 25 MB.`);
+      return;
+    }
+
     setIsUploading(true);
-    showInfo(`Uploading and indexing "${file.name}" into ChromaDB...`);
+    showInfo(`Uploading "${file.name}"...`);
 
     try {
-      const uploadedDoc = await uploadDocumentFile(file);
-      showSuccess(`"${file.name}" uploaded successfully! Indexing into ChromaDB vector store...`);
+      const uploadedDoc = await uploadDocumentFile(file, undefined, activeWorkspace?.id);
+      showSuccess(`"${file.name}" uploaded successfully! Indexing into vector store...`);
       if (uploadedDoc && uploadedDoc.id) {
         handleDocSelectChange(uploadedDoc.id);
       }
       handleModeChange('document');
       await loadWorkspaceDocuments();
     } catch (err: any) {
-      showError(err?.response?.data?.detail || `Failed to index "${file.name}".`);
+      const errMsg = err?.response?.data?.detail || err?.message || `Failed to upload "${file.name}".`;
+      showError(errMsg);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    await uploadFileWithValidation(e.target.files[0]);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await uploadFileWithValidation(e.dataTransfer.files[0]);
     }
   };
 
@@ -687,6 +743,9 @@ export const ChatPage: React.FC = () => {
   return (
     <div
       ref={chatContainerRef}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       className={`h-full min-h-0 flex-1 flex rounded-2xl border border-slate-200/90 dark:border-slate-800/90 bg-white/70 dark:bg-[#10131d]/75 backdrop-blur-xl text-slate-800 dark:text-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] overflow-hidden relative ${
         isFullscreen ? 'fixed inset-0 z-50 h-screen rounded-none border-none' : ''
       }`}
@@ -697,8 +756,23 @@ export const ChatPage: React.FC = () => {
         ref={fileInputRef}
         onChange={handleFileUpload}
         className="hidden"
-        accept=".pdf,.docx,.pptx,.xlsx,.txt,.csv,.md,.png,.jpg,.jpeg"
+        accept=".pdf,.docx,.pptx,.xlsx,.txt,.csv,.md,.png,.jpg,.jpeg,.bmp"
       />
+
+      {/* Drag & Drop Visual Overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 bg-blue-600/10 dark:bg-cyan-500/10 border-2 border-dashed border-blue-500 dark:border-cyan-400 rounded-2xl z-50 flex flex-col items-center justify-center backdrop-blur-xs pointer-events-none animate-fade-in">
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-blue-200 dark:border-cyan-500/30 flex flex-col items-center space-y-2 text-center">
+            <UploadCloud className="w-10 h-10 text-blue-600 dark:text-cyan-400 animate-bounce" />
+            <p className="text-sm font-bold text-slate-900 dark:text-white">
+              Drop document to upload & index
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs">
+              Supports PDF, DOCX, TXT, CSV, Markdown, and images up to 25 MB
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Drawer Overlay Backdrop for Conversation History */}
       {isHistoryOpen && (
@@ -867,7 +941,7 @@ export const ChatPage: React.FC = () => {
       </aside>
 
       {/* Main Chat Canvas */}
-      <main className="flex-1 flex flex-col h-full bg-transparent relative min-w-0">
+      <main className="flex-1 flex flex-col h-full bg-transparent relative min-w-0 min-h-0">
         
         {/* Top Header Bar */}
         <header className="h-14 sm:h-16 border-b border-slate-200/80 dark:border-slate-800/80 px-2.5 sm:px-4 md:px-6 flex items-center justify-between bg-white/80 dark:bg-[#121520]/80 backdrop-blur-xl shrink-0 gap-2">
@@ -916,31 +990,52 @@ export const ChatPage: React.FC = () => {
 
           {/* Right Controls: Model Pill, Fullscreen, Options */}
           <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-            {/* Model Selector Pill */}
-            <div className="relative">
+            {/* Model Selector Pill with Portal-like Z-Index & Auto-scrolling */}
+            <div className="relative" ref={modelDropdownRef}>
               <button
+                type="button"
                 onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
                 className="flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer min-h-[36px]"
+                aria-haspopup="true"
+                aria-expanded={isModelDropdownOpen}
               >
                 <Cpu className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400 shrink-0" />
-                <span className="max-w-[70px] sm:max-w-[90px] truncate">{selectedModel}</span>
+                <span className="max-w-[70px] sm:max-w-[110px] truncate">{selectedModel}</span>
                 <ChevronDown className={`w-3 h-3 text-slate-400 shrink-0 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {isModelDropdownOpen && (
-                <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-[#151926] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-30 py-1 animate-pop-in">
-                  {availableModels.map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => {
-                        setSelectedModel(m);
-                        setIsModelDropdownOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-700 dark:hover:text-cyan-300 transition-colors"
-                    >
-                      {m}
-                    </button>
-                  ))}
+                <div className="absolute right-0 top-full mt-2 w-64 max-h-64 overflow-y-auto scrollbar-thin bg-white dark:bg-[#151926] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 p-1.5 animate-pop-in space-y-1">
+                  <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Select Inference Engine
+                  </div>
+                  {availableModels.map((m) => {
+                    const isSelected = m === selectedModel;
+                    const isCloud = !m.includes('MLC') && m !== 'in-browser-extractive';
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          setSelectedModel(m);
+                          setIsModelDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-2 text-xs rounded-xl transition-colors text-left cursor-pointer ${
+                          isSelected
+                            ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-cyan-300 font-semibold'
+                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                        }`}
+                      >
+                        <div className="truncate pr-2">
+                          <p className="truncate text-xs">{m}</p>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                            {isCloud ? 'Cloud AI Provider' : 'Local In-Browser Engine'}
+                          </p>
+                        </div>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400 shrink-0" />}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -997,7 +1092,7 @@ export const ChatPage: React.FC = () => {
         </header>
 
         {/* Message Stream Feed */}
-        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5 scrollbar-thin">
+        <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 space-y-5 scrollbar-thin">
           {!activeThread || activeThread.messages.length === 0 ? (
             
             /* Central Empty State with Three.js Knowledge Orb */
@@ -1273,7 +1368,7 @@ export const ChatPage: React.FC = () => {
             }}
             className="max-w-4xl mx-auto"
           >
-            <div className="flex items-end space-x-2 bg-white/95 dark:bg-[#131c2e] border border-slate-300/90 dark:border-blue-900/50 rounded-2xl px-3 py-2 sm:px-3.5 sm:py-2.5 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all shadow-xs backdrop-blur-xl">
+            <div className="flex items-center space-x-2 bg-white/95 dark:bg-[#131c2e] border border-slate-300/90 dark:border-blue-900/50 rounded-2xl px-3 py-2 sm:px-3.5 sm:py-2.5 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all shadow-xs backdrop-blur-xl">
               
               {/* Attach Document / OCR File Button */}
               <button
@@ -1282,13 +1377,14 @@ export const ChatPage: React.FC = () => {
                   if (chatMode !== 'document') setChatMode('document');
                   fileInputRef.current?.click();
                 }}
-                disabled={isUploading || isStreaming}
-                className={`p-1.5 sm:p-2 rounded-xl transition-colors cursor-pointer mb-0.5 shrink-0 ${
+                disabled={isUploading}
+                className={`p-1.5 sm:p-2 rounded-xl transition-colors cursor-pointer shrink-0 ${
                   chatMode === 'document'
                     ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-cyan-300 hover:text-blue-900 dark:hover:text-white'
                     : 'text-slate-400 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/50'
                 }`}
-                title="Attach Document or Image to Index (ChromaDB + OCR)"
+                title="Attach Document or Image to Index"
+                aria-label="Attach document"
               >
                 {isUploading ? <RefreshCw className="w-4 h-4 animate-spin text-blue-600" /> : <Paperclip className="w-4 h-4" />}
               </button>
@@ -1315,19 +1411,28 @@ export const ChatPage: React.FC = () => {
                 className="flex-1 bg-transparent text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none text-xs md:text-sm py-1.5 leading-relaxed resize-none max-h-40 overflow-y-auto scrollbar-thin disabled:opacity-50 disabled:cursor-not-allowed"
               />
 
-              {/* Send Button with micro-animation */}
-              <button
-                type="submit"
-                disabled={!input.trim() || isStreaming}
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center shadow-md shadow-blue-500/25 transition-all cursor-pointer shrink-0 mb-0.5 hover:scale-105 active:scale-95"
-                title="Send Message (Enter to send, Shift+Enter for new line)"
-              >
-                {isStreaming ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
+              {/* Send or Stop Button */}
+              {isStreaming ? (
+                <button
+                  type="button"
+                  onClick={() => cancelStreamRef.current?.()}
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-md shadow-rose-500/25 transition-all cursor-pointer shrink-0 hover:scale-105 active:scale-95"
+                  title="Stop generating"
+                  aria-label="Stop generating response"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!input.trim()}
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center shadow-md shadow-blue-500/25 transition-all cursor-pointer shrink-0 hover:scale-105 active:scale-95"
+                  title="Send Message (Enter to send, Shift+Enter for new line)"
+                  aria-label="Send message"
+                >
                   <Send className="w-4 h-4" />
-                )}
-              </button>
+                </button>
+              )}
             </div>
             <div className="flex items-center justify-between px-2 pt-1 text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 font-medium">
               <span className="hidden sm:inline">Enter to send • Shift+Enter for new line</span>

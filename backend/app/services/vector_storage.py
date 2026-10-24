@@ -112,7 +112,11 @@ class VectorStorageService:
             metadatas.append(clean_meta)
 
         if not ids:
-            raise ValueError(f"No valid embeddings found in chunks for document ID {document_id}.")
+            logger.info(f"No vector embeddings available for document ID {document_id}. Marking document as indexed for SQLite lexical search.")
+            doc.status = "indexed"
+            doc.error_message = None
+            db.commit()
+            return 0
 
         logger.info(f"Upserting {len(ids)} vectors for document ID {document_id} into ChromaDB collection...")
         collection.upsert(

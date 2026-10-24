@@ -88,12 +88,18 @@ export const fetchDocuments = async (): Promise<DocumentItem[]> => {
 
 export const uploadDocumentFile = async (
   file: File,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  workspaceId?: number | string
 ): Promise<DocumentItem> => {
-  if (typeof navigator === 'undefined' || navigator.onLine) {
+  const isOnline = typeof navigator === 'undefined' || navigator.onLine;
+
+  if (isOnline) {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      if (workspaceId) {
+        formData.append('workspace_id', String(workspaceId));
+      }
 
       const response = await apiClient.post<{ success: boolean; message: string; data: DocumentItem }>(
         '/documents/upload',
@@ -109,8 +115,10 @@ export const uploadDocumentFile = async (
       );
 
       return response.data.data;
-    } catch (err) {
-      console.warn('[DocumentService] Upload failed online, falling back to in-browser indexing:', err);
+    } catch (err: any) {
+      console.error('[DocumentService] Backend upload error:', err);
+      // Re-throw online errors so UI components can display genuine backend messages
+      throw err;
     }
   }
 
@@ -135,7 +143,7 @@ export const uploadDocumentFile = async (
     file_size: file.size,
     content: rawContent,
     chunks,
-    workspace_id: 1,
+    workspace_id: typeof workspaceId === 'number' ? workspaceId : 1,
     status: 'Indexed',
     created_at: now,
   };
