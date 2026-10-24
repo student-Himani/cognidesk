@@ -555,6 +555,7 @@ class RAGPipelineService:
         }
         yield f"data: {json.dumps(header_meta)}\n\n"
 
+        tokens_yielded = 0
         try:
             for token in provider.stream_generate(
                 prompt=user_prompt,
@@ -563,11 +564,35 @@ class RAGPipelineService:
                 temperature=0.3
             ):
                 if token:
+                    tokens_yielded += 1
                     chunk_event = {"type": "token", "token": token}
                     yield f"data: {json.dumps(chunk_event)}\n\n"
+            if tokens_yielded == 0:
+                logger.info(f"Streaming yielded 0 tokens for {provider.provider_name}, generating complete answer as fallback...")
+                res = provider.generate(
+                    prompt=user_prompt,
+                    system=sys_prompt,
+                    model=model,
+                    temperature=0.3
+                )
+                if res.text:
+                    yield f"data: {json.dumps({'type': 'token', 'token': res.text})}\n\n"
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
         except CloudProviderError as cpe:
-            logger.warning(f"Provider {provider.provider_name} streaming error: {cpe}")
+            logger.warning(f"Provider {provider.provider_name} streaming error: {cpe}, attempting non-streaming generate fallback...")
+            try:
+                res = provider.generate(
+                    prompt=user_prompt,
+                    system=sys_prompt,
+                    model=model,
+                    temperature=0.3
+                )
+                if res.text:
+                    yield f"data: {json.dumps({'type': 'token', 'token': res.text})}\n\n"
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                return
+            except Exception as gen_err:
+                logger.warning(f"Generate fallback also failed: {gen_err}")
             error_event = {
                 "type": "error",
                 "error": str(cpe),
