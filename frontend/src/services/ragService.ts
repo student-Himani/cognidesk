@@ -62,16 +62,13 @@ export interface OllamaStatusResponse {
 
 export const sendRagQuery = async (payload: RagQueryRequest): Promise<RagResponseData> => {
   if (typeof navigator === 'undefined' || navigator.onLine) {
-    try {
-      const response = await apiClient.post<RagApiResponse>('/rag/query', payload);
-      return response.data.data;
-    } catch (err) {
-      console.warn('[RagService] API query failed, activating offline in-browser RAG:', err);
-    }
+    const response = await apiClient.post<RagApiResponse>('/rag/query', payload);
+    return response.data.data;
   }
 
-  // Offline In-Browser Local AI Execution
-  const localChunks = await localDb.searchLocalChunks(payload.query, 1, payload.top_k || 3);
+  // Offline In-Browser Local AI Execution (Strictly offline / air-gapped only)
+  const isDocMode = payload.mode === 'document';
+  const localChunks = isDocMode ? await localDb.searchLocalChunks(payload.query, 1, payload.top_k || 3) : [];
   const result = await browserAiEngine.generateOfflineAnswer({
     query: payload.query,
     chunks: localChunks,
@@ -223,39 +220,6 @@ export const streamRagQuery = (
               } else if (parsed.type === 'token') {
                 onToken(parsed.token);
               } else if (parsed.type === 'error') {
-                if (parsed.provider === 'unconfigured' || parsed.error?.includes('Setup Required')) {
-                  console.info('[RagService] Server-side hosted provider unconfigured, seamlessly engaging In-Browser AI Engine.');
-                  try {
-                    const localChunks = await localDb.searchLocalChunks(payload.query, 1, payload.top_k || 3);
-                    const citations: RagCitation[] = localChunks.map((c) => ({
-                      docName: c.docName,
-                      page: `Chunk #${c.chunkIndex}`,
-                      score: c.scoreText,
-                      documentId: typeof c.documentId === 'number' ? c.documentId : 1,
-                    }));
-
-                    onMetadata({
-                      model: 'In-Browser Local AI (Instant Mode)',
-                      citations,
-                      context_used_count: citations.length,
-                    });
-
-                    await browserAiEngine.streamOfflineAnswer(
-                      {
-                        query: payload.query,
-                        chunks: localChunks,
-                        modelId: payload.model,
-                        conversationHistory: payload.messages?.map((m) => ({ sender: m.sender, text: m.text })),
-                      },
-                      onToken,
-                      onDone,
-                      onError
-                    );
-                    return;
-                  } catch (e) {
-                    // fallback to standard error reporting if in-browser execution fails
-                  }
-                }
                 onError(new Error(parsed.error || 'AI generation error'));
                 return;
               } else if (parsed.type === 'done') {
@@ -272,10 +236,19 @@ export const streamRagQuery = (
     .catch(async (err) => {
       if (err.name === 'AbortError') return;
 
-      // In-Browser Local AI Offline (WebLLM / Extractive RAG)
-      console.warn('[RagService] Cloud stream unavailable, executing in-browser AI engine:', err);
+      const isOfflineModel = payload.model === 'in-browser-extractive' || payload.model?.includes('MLC');
+      const isStrictlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+      if (!isOfflineModel && !isStrictlyOffline) {
+        // Online cloud or backend error: show actual error to user
+        onError(err);
+        return;
+      }
+
+      // Air-gapped or explicit local offline execution
       try {
-        const localChunks = await localDb.searchLocalChunks(payload.query, 1, payload.top_k || 3);
+        const isDocMode = payload.mode === 'document';
+        const localChunks = isDocMode ? await localDb.searchLocalChunks(payload.query, 1, payload.top_k || 3) : [];
         const citations: RagCitation[] = localChunks.map((c) => ({
           docName: c.docName,
           page: `Chunk #${c.chunkIndex}`,

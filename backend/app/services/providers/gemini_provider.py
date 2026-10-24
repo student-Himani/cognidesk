@@ -196,6 +196,7 @@ class GeminiProvider(BaseLLMProvider):
     ) -> Generator[str, None, None]:
         headers = self._get_headers()
         candidate_models = self._get_candidate_models(model)
+        payload = self._format_gemini_payload(prompt, system, temperature, max_tokens)
         # Responsive timeout for streaming: fail over quickly if Google buffers or stalls
         custom_timeout = httpx.Timeout(15.0, connect=10.0, read=15.0, write=15.0)
 
