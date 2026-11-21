@@ -61,12 +61,15 @@ export interface OllamaStatusResponse {
 }
 
 export const sendRagQuery = async (payload: RagQueryRequest): Promise<RagResponseData> => {
-  if (typeof navigator === 'undefined' || navigator.onLine) {
+  const isExplicitOfflineModel = payload.model === 'in-browser-extractive' || payload.model?.includes('MLC');
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+  if (!isExplicitOfflineModel && !isOffline) {
     const response = await apiClient.post<RagApiResponse>('/rag/query', payload);
     return response.data.data;
   }
 
-  // Offline In-Browser Local AI Execution (Strictly offline / air-gapped only)
+  // Offline In-Browser Local AI Execution (Explicit local model or strictly offline)
   const isDocMode = payload.mode === 'document';
   const localChunks = isDocMode ? await localDb.searchLocalChunks(payload.query, 1, payload.top_k || 3) : [];
   const result = await browserAiEngine.generateOfflineAnswer({
@@ -164,6 +167,55 @@ export const streamRagQuery = (
   const baseUrl = getApiBaseUrl();
   const controller = new AbortController();
 
+  const isExplicitOfflineModel = payload.model === 'in-browser-extractive' || payload.model?.includes('MLC');
+  const isStrictlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+  // Direct In-Browser Local / Air-Gapped Execution
+  if (isExplicitOfflineModel || isStrictlyOffline) {
+    let cancelOffline: (() => void) | null = null;
+    (async () => {
+      try {
+        const isDocMode = payload.mode === 'document';
+        const localChunks = isDocMode ? await localDb.searchLocalChunks(payload.query, 1, payload.top_k || 3) : [];
+        const citations: RagCitation[] = localChunks.map((c) => ({
+          docName: c.docName,
+          page: `Chunk #${c.chunkIndex}`,
+          score: c.scoreText,
+          documentId: typeof c.documentId === 'number' ? c.documentId : 1,
+        }));
+
+        onMetadata({
+          model: payload.model || 'In-Browser Local AI',
+          citations,
+          context_used_count: citations.length,
+        });
+
+        cancelOffline = await browserAiEngine.streamOfflineAnswer(
+          {
+            query: payload.query,
+            chunks: localChunks,
+            modelId: payload.model,
+            conversationHistory: payload.messages?.map((m) => ({ sender: m.sender, text: m.text })),
+          },
+          onToken,
+          onDone,
+          onError
+        );
+
+        controller.signal.addEventListener('abort', () => {
+          if (cancelOffline) cancelOffline();
+        });
+      } catch (offlineErr) {
+        onError(offlineErr);
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      if (cancelOffline) cancelOffline();
+    };
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-CogniDesk-Client': 'WebUI-v1.0',
@@ -236,48 +288,8 @@ export const streamRagQuery = (
     .catch(async (err) => {
       if (err.name === 'AbortError') return;
 
-      const isOfflineModel = payload.model === 'in-browser-extractive' || payload.model?.includes('MLC');
-      const isStrictlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-
-      if (!isOfflineModel && !isStrictlyOffline) {
-        // Online cloud or backend error: show actual error to user
-        onError(err);
-        return;
-      }
-
-      // Air-gapped or explicit local offline execution
-      try {
-        const isDocMode = payload.mode === 'document';
-        const localChunks = isDocMode ? await localDb.searchLocalChunks(payload.query, 1, payload.top_k || 3) : [];
-        const citations: RagCitation[] = localChunks.map((c) => ({
-          docName: c.docName,
-          page: `Chunk #${c.chunkIndex}`,
-          score: c.scoreText,
-          documentId: typeof c.documentId === 'number' ? c.documentId : 1,
-        }));
-
-        onMetadata({
-          model: payload.model || 'In-Browser Local AI',
-          citations,
-          context_used_count: citations.length,
-        });
-
-        const cancelOfflineStream = await browserAiEngine.streamOfflineAnswer(
-          {
-            query: payload.query,
-            chunks: localChunks,
-            modelId: payload.model,
-            conversationHistory: payload.messages?.map((m) => ({ sender: m.sender, text: m.text })),
-          },
-          onToken,
-          onDone,
-          onError
-        );
-
-        controller.signal.addEventListener('abort', () => cancelOfflineStream());
-      } catch (fallbackErr) {
-        onError(err);
-      }
+      // Online cloud or backend error: show actual error to user
+      onError(err);
     });
 
   return () => controller.abort();

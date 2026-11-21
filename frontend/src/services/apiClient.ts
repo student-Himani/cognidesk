@@ -100,9 +100,10 @@ apiClient.interceptors.response.use(
     const config = error.config || {};
     const url = config.url || '';
 
-    // Silence global error toast for background probes or callers that requested skipGlobalToast
-    const isProbe = url.includes('/rag/status') || url.includes('/health') || url.includes('/settings');
-    const skipToast = (config as any).skipGlobalToast || config.headers?.['X-Skip-Global-Toast'] || isProbe;
+    // Silence global error toast for background probes, offline checks, or callers that requested skipGlobalToast
+    const isProbe = url.includes('/rag/status') || url.includes('/health') || url.includes('/settings') || url.includes('/auth/me');
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    const skipToast = (config as any).skipGlobalToast || config.headers?.['X-Skip-Global-Toast'] || isProbe || isOffline;
 
     if (!skipToast) {
       let rawMsg =
