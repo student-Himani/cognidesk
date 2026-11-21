@@ -842,10 +842,10 @@ class FlashcardsService:
 
         # 5. Check if we have at least 1 valid card
         if not final_cards_data:
-            if not ollama_status["online"]:
+            if provider is None or getattr(provider, "provider_name", "") == "ollama":
                 raise ValueError(
                     f"Local Ollama AI is offline and document '{doc.original_filename}' does not contain "
-                    "detectable declarative definition patterns. Please start Ollama to generate AI flashcards."
+                    "detectable declarative definition patterns. Please start Ollama or configure Cloud AI to generate AI flashcards."
                 )
             raise ValueError(
                 f"Could not generate valid, factually grounded flashcards from '{doc.original_filename}'. "

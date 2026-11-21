@@ -169,38 +169,38 @@ def get_llm_provider(
         )
 
     # 4. User-Configured Custom Cloud Provider from Database Settings
-    if is_cloud and cloud_api_key:
+    if is_cloud:
         if cloud_provider_name == "anthropic" or ai_provider == "anthropic":
             base_url = cloud_base_url if cloud_base_url and "api.anthropic.com" in cloud_base_url else "https://api.anthropic.com"
             return AnthropicProvider(
-                api_key=cloud_api_key,
+                api_key=cloud_api_key or "sk-ant-unconfigured",
                 model=cloud_model or "claude-3-5-sonnet-20241022",
                 base_url=base_url
             )
         elif cloud_provider_name == "gemini" or ai_provider == "gemini":
             return GeminiProvider(
-                api_key=cloud_api_key or gemini_key,
+                api_key=cloud_api_key or gemini_key or "unconfigured",
                 model=cloud_model or "gemini-3.8-flash",
                 base_url=cloud_base_url
             )
         elif cloud_provider_name == "groq" or ai_provider == "groq":
             base_url = cloud_base_url if cloud_base_url and "groq.com" in cloud_base_url else "https://api.groq.com/openai/v1"
             return OpenAIProvider(
-                api_key=cloud_api_key,
+                api_key=cloud_api_key or groq_key or "gsk-unconfigured",
                 model=cloud_model or "llama-3.3-70b-versatile",
                 base_url=base_url
             )
         elif cloud_provider_name == "openrouter" or ai_provider == "openrouter":
             base_url = cloud_base_url if cloud_base_url and "openrouter.ai" in cloud_base_url else "https://openrouter.ai/api/v1"
             return OpenAIProvider(
-                api_key=cloud_api_key,
+                api_key=cloud_api_key or openrouter_key or "sk-or-unconfigured",
                 model=cloud_model or "meta-llama/llama-3.3-70b-instruct",
                 base_url=base_url
             )
         else:
             base_url = cloud_base_url if cloud_base_url else "https://api.openai.com/v1"
             return OpenAIProvider(
-                api_key=cloud_api_key,
+                api_key=cloud_api_key or openai_key or "sk-unconfigured",
                 model=cloud_model or "gpt-4o-mini",
                 base_url=base_url
             )

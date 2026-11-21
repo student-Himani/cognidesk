@@ -21,6 +21,11 @@ if _venv_python.exists() and Path(sys.executable).resolve() != _venv_python.reso
 import pytest
 from PIL import Image, ImageDraw, ImageFont
 
+try:
+    import easyocr
+except ImportError:
+    easyocr = None
+
 # Add backend to sys.path
 backend_path = _root_dir / "backend"
 if str(backend_path) not in sys.path:
@@ -74,6 +79,7 @@ def sample_ocr_image(tmp_path):
             pass
 
 
+@pytest.mark.skipif(easyocr is None, reason="EasyOCR is not installed in this environment")
 def test_offline_ocr_direct_processing(sample_ocr_image):
     """Test that DocumentProcessor correctly reads and extracts text from an image."""
     raw_text, cleaned_text, metadata, page_count, word_count = document_processor.process_file(
@@ -94,6 +100,7 @@ def test_offline_ocr_direct_processing(sample_ocr_image):
     assert metadata.get("ocr_confidence", 0) > 0
 
 
+@pytest.mark.skipif(easyocr is None, reason="EasyOCR is not installed in this environment")
 def test_offline_ocr_database_pipeline_and_search(setup_db, sample_ocr_image):
     """
     Test full end-to-end pipeline:

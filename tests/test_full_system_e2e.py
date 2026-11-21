@@ -169,8 +169,14 @@ def test_02_multi_format_document_upload(e2e_context):
     """2. Upload TXT, PDF, DOCX and image documents into Workspace A."""
     ws_a_id = e2e_context["ws_a_id"]
 
-    # Synthetic TXT
-    txt_content = b"CogniDesk offline artificial intelligence workspace. Local embeddings and privacy-first knowledge retrieval."
+    # Synthetic TXT with substantive conceptual content
+    txt_content = (
+        b"CogniDesk is an offline artificial intelligence workspace designed for privacy. "
+        b"Local embeddings provide semantic search and fast vector retrieval. "
+        b"ChromaDB stores document vectors for rapid contextual similarity querying. "
+        b"SQLite manages relational database storage for workspaces, notes, and chat threads. "
+        b"Ollama executes local language models for zero-network question answering."
+    )
     res_txt = client.post(
         "/api/v1/documents/upload",
         files={"file": ("e2e_quantum.txt", io.BytesIO(txt_content), "text/plain")},

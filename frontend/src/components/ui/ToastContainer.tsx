@@ -51,9 +51,12 @@ export const ToastContainer: React.FC = () => {
 
   if (toasts.length === 0) return null;
 
+  // Show at most 2 toasts at a time to prevent stacking over the chat composer
+  const visibleToasts = toasts.slice(-2);
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col space-y-3 pointer-events-none">
-      {toasts.map((t) => (
+    <div className="fixed bottom-24 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col space-y-2 pointer-events-none max-w-[calc(100vw-2rem)] sm:max-w-md">
+      {visibleToasts.map((t) => (
         <ToastItem key={t.id} toast={t} />
       ))}
     </div>

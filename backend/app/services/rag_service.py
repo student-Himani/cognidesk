@@ -437,17 +437,18 @@ class RAGPipelineService:
             answer_text = llm_res.text
             target_model = llm_res.model
             used_ollama = (provider.provider_name == "ollama")
-        except CloudProviderError:
-            raise
+        except CloudProviderError as cpe:
+            logger.warning(f"Provider '{provider.provider_name}' error: {cpe}")
+            answer_text = str(cpe)
+            target_model = model or getattr(provider, "model", "unknown")
+            used_ollama = False
         except OfflineModeEnforcedError:
             raise
         except Exception as e:
             logger.error(f"Unexpected generation error ({provider.provider_name}): {e}")
-            raise CloudProviderError(
-                f"LLM Generation Error ({provider.provider_name}): {str(e)}",
-                status_code=500,
-                provider=provider.provider_name
-            )
+            answer_text = f"LLM Generation Error ({provider.provider_name}): {str(e)}"
+            target_model = model or getattr(provider, "model", "unknown")
+            used_ollama = False
 
         elapsed_ms = round((time.time() - start_time) * 1000, 2)
 

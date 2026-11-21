@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { store } from '../store';
-import { addToast } from '../store/slices/toastSlice';
+import { addToast, dismissConnectionToasts } from '../store/slices/toastSlice';
 
 function resolveInitialBaseUrl(): string {
   if (import.meta.env.VITE_API_BASE_URL) {
@@ -91,9 +91,17 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Track last connection notice timestamp to throttle repeated cold-start alerts
+let lastConnectionToastTime = 0;
+
 // Response Interceptor with Global Error Handling
 apiClient.interceptors.response.use(
   (response) => {
+    // When backend responds successfully, automatically clear active cold-start/connection notices
+    if (lastConnectionToastTime > 0) {
+      lastConnectionToastTime = 0;
+      store.dispatch(dismissConnectionToasts());
+    }
     return response;
   },
   (error) => {
@@ -115,18 +123,32 @@ apiClient.interceptors.response.use(
       let errorMessage = typeof rawMsg === 'string' ? rawMsg : JSON.stringify(rawMsg);
       let errorTitle = 'API Request Error';
       let toastType: 'error' | 'warning' | 'info' = 'error';
+      let isConnectionIssue = false;
 
       // Provide clear friendly guidance if backend is waking up or temporarily unavailable
       if (!error.response || error.code === 'ERR_NETWORK') {
+        isConnectionIssue = true;
         errorTitle = 'Connection Notice';
         toastType = 'warning';
         errorMessage = 'Backend instance is starting up (~30s Render cold-start). Please wait a moment...';
       } else if (error.response?.status === 503) {
+        isConnectionIssue = true;
         errorTitle = 'Service Notice';
         toastType = 'warning';
         if (errorMessage.includes('No valid LLM provider configured')) {
           errorMessage = 'Cloud AI key is not yet configured. Please set your Groq, Gemini, or OpenAI API key in Settings.';
+        } else if (errorMessage.includes('starting up') || errorMessage.includes('cold-start') || errorMessage.includes('temporarily unavailable')) {
+          errorMessage = 'Backend is warming up on Render. Retrying automatically...';
         }
+      }
+
+      // Throttle connection / cold-start toasts to once every 20 seconds
+      const now = Date.now();
+      if (isConnectionIssue) {
+        if (now - lastConnectionToastTime < 20000) {
+          return Promise.reject(error);
+        }
+        lastConnectionToastTime = now;
       }
 
       // Dispatch global toast error

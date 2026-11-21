@@ -156,7 +156,7 @@ async def upload_document(
 
     counter = 1
     name_part, ext_part = os.path.splitext(filename)
-    while os.path.exists(file_path):
+    while os.path.exists(file_path) or db.query(Document).filter(Document.filename == filename).first() is not None:
         filename = f"{name_part}_{counter}{ext_part}"
         file_path = os.path.abspath(os.path.join(absolute_upload_dir, filename))
         counter += 1
