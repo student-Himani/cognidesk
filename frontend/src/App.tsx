@@ -23,7 +23,15 @@ export const App: React.FC = () => {
     return typeof window !== 'undefined' && window.location.search.includes('preview_loader=true');
   });
   const [isStartingUp, setIsStartingUp] = useState<boolean>(() => {
-    return true;
+    if (typeof window !== 'undefined') {
+      if (window.location.search.includes('preview_loader=true')) return true;
+      // Show startup animation once per browser session; subsequent refreshes open instantly
+      const hasSeen = sessionStorage.getItem('cognidesk_startup_seen');
+      if (hasSeen) return false;
+      sessionStorage.setItem('cognidesk_startup_seen', 'true');
+      return true;
+    }
+    return false;
   });
 
   useEffect(() => {

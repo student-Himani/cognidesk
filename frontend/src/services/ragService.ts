@@ -1,6 +1,11 @@
 import apiClient, { getApiBaseUrl } from './apiClient';
 import { localDb } from './localDb';
-import { browserAiEngine } from './browserAiEngine';
+
+// Lazy loader for in-browser neural engine to prevent heavy bundle overhead on initial app load
+const getBrowserAiEngine = async () => {
+  const mod = await import('./browserAiEngine');
+  return mod.browserAiEngine;
+};
 
 export interface RagCitation {
   docName: string;
@@ -72,7 +77,8 @@ export const sendRagQuery = async (payload: RagQueryRequest): Promise<RagRespons
   // Offline In-Browser Local AI Execution (Explicit local model or strictly offline)
   const isDocMode = payload.mode === 'document';
   const localChunks = isDocMode ? await localDb.searchLocalChunks(payload.query, 1, payload.top_k || 3) : [];
-  const result = await browserAiEngine.generateOfflineAnswer({
+  const engine = await getBrowserAiEngine();
+  const result = await engine.generateOfflineAnswer({
     query: payload.query,
     chunks: localChunks,
     modelId: payload.model,
@@ -190,7 +196,8 @@ export const streamRagQuery = (
           context_used_count: citations.length,
         });
 
-        cancelOffline = await browserAiEngine.streamOfflineAnswer(
+        const engine = await getBrowserAiEngine();
+        cancelOffline = await engine.streamOfflineAnswer(
           {
             query: payload.query,
             chunks: localChunks,

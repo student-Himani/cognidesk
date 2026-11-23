@@ -91,7 +91,7 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
 
     const isPreview = typeof window !== 'undefined' && window.location.search.includes('preview_loader=true');
 
-    // Stage 1: Core Ignite at 600ms
+    // Stage 1: Core Ignite at 300ms
     const igniteTimer = setTimeout(() => {
       setAnimStage('coreIgnite');
       setStatusMessage(
@@ -99,14 +99,14 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
           ? 'Loading Knowledge Vector Indexes & Models...'
           : 'Verifying IndexedDB Storage & Vector Indexes...'
       );
-    }, 600);
+    }, 300);
 
-    // Allow user to tap/skip after 900ms
+    // Allow user to tap/skip immediately
     const skipTimer = setTimeout(() => {
       setCanSkip(true);
-    }, 900);
+    }, 300);
 
-    // Stage 2: Fingertip Contact & Fusion at 1200ms
+    // Stage 2: Fingertip Contact & Fusion at 600ms
     const contactTimer = setTimeout(() => {
       setAnimStage('contact');
       setStatusMessage(
@@ -114,21 +114,21 @@ export const CogniDeskStartupAnimation: React.FC<CogniDeskStartupAnimationProps>
           ? 'Verifying SQLite Database & Local Engine...'
           : 'Connecting to Cloud AI & Local Workspace...'
       );
-    }, 1200);
+    }, 600);
 
-    // Stage 3: Smooth automatic completion for Web & Mobile at 2500ms
+    // Stage 3: Smooth automatic completion for Web & Mobile at 1400ms
     const completionTimer = setTimeout(() => {
       if (!isPreview) {
         handleProceed();
       }
-    }, isDesktop ? 3800 : 2500);
+    }, isDesktop ? 2200 : 1400);
 
-    // Stage 4: Absolute safety fallback (max 3800ms)
+    // Stage 4: Absolute safety fallback (max 2500ms)
     const safetyTimer = setTimeout(() => {
       if (!isPreview) {
         handleProceed();
       }
-    }, isDesktop ? 6000 : 3800);
+    }, isDesktop ? 3000 : 2500);
 
     if (isPreview) {
       return () => {

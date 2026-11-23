@@ -14,6 +14,19 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'lucide-react',
+      'axios',
+      '@reduxjs/toolkit',
+      'react-redux',
+      'three',
+    ],
+    exclude: ['@mlc-ai/web-llm'],
+  },
   server: {
     port: 5173,
     host: true,
